@@ -1,0 +1,65 @@
+/* all themes */
+font-family: "Swiss911 UCm BT", sans-serif;
+background-color: 
+#000000			0,0,0
+text color on anything that isn't black background: #000000
+active toggle button background color = main window title text color. 
+only exception to this is red alert, where active buttons use main text "white" as background
+
+/* TNG */
+main text color: 
+#C3D1FE		195,209,254
+large swoop: 
+#F6F49F		246,244,159
+data labels: 
+#8180F7		129,128,247
+subwindow frames: 
+#EAC68A		234,198,138
+active toggled button: 
+#F8D941		248,217,65
+main window title text:
+#F8D941		248,217,65
+
+/* RED ALERT */
+main text color: 
+#DEDEDE		222,222,222
+large swoop: 
+#FE0000		230,0,0
+data labels: 
+#FE0000		230,0,0
+subwindow frames: 
+#990000		153,0,0
+active toggled button: 
+#DEDEDE		222,222,222
+main window title text:
+#FFFFBD		255,255,189
+
+/* DS9 */
+main text color: 
+#BAA3CD		186,163,205
+large swoop: 
+#D49E82		212,158,130
+data labels: 
+#7C516F		124,81,111
+subwindow frames: 
+#EC943A		236,148,58
+active toggled button: 
+#C57C69		197,124,105
+main window title text:
+#C57C69		197,124,105
+
+/* VOY */
+main text color: 
+#99CCFF		153,204,255
+large swoop: 
+#7A86A0		122,134,160
+data labels: 
+#9999FF		153,153,255
+subwindow frames 1: 
+#C3DCC7		195,220,199
+subwindow frames 2:
+#CC6699		204,102,152
+active toggled button: 
+#FFCC66		255,244,122
+main window title text:
+#FFCC66		255,244,122
