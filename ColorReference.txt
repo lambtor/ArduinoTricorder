@@ -1,4 +1,5 @@
 /* all themes */
+/* colors are listed as HTML  RGB   UINT16 (arduino adafruit_gfx tft parameter format) */
 font-family: "Swiss911 UCm BT", sans-serif;
 background-color: 
 #000000			0,0,0
@@ -7,59 +8,59 @@ active toggle button background color = main window title text color.
 only exception to this is red alert, where active buttons use main text "white" as background
 
 /* TNG */
-main text color: 
-#C3D1FE		195,209,254
-large swoop: 
-#F6F49F		246,244,159
-data labels: 
-#8180F7		129,128,247
-subwindow frames: 
-#EAC68A		234,198,138
-active toggled button: 
-#F8D941		248,217,65
+main text color (pale light blue): 
+#C3D1FE		195,209,254     0xC69F
+large swoop (pale yellow): 
+#F6F49F		246,244,159     0xF7B3
+data labels (purple): 
+#8180F7		129,128,247     0x841E
+subwindow frames (pale tan): 
+#EAC68A		234,198,138     0xEE31
+active toggled button (yellow): 
+#F8D941		248,217,65      0xFEC8
 main window title text:
-#F8D941		248,217,65
+#F8D941		248,217,65      0xFEC8
 
 /* RED ALERT */
 main text color: 
-#DEDEDE		222,222,222
+#DEDEDE		222,222,222     0xDEFB
 large swoop: 
-#FE0000		230,0,0
+#FE0000		230,0,0         0xE000
 data labels: 
-#FE0000		230,0,0
+#FE0000		230,0,0         0xE000
 subwindow frames: 
-#990000		153,0,0
+#990000		153,0,0         0x9800
 active toggled button: 
-#DEDEDE		222,222,222
+#DEDEDE		222,222,222     0xDEFB
 main window title text:
-#FFFFBD		255,255,189
+#FFFFBD		255,255,189     0xFFF7
 
 /* DS9 */
 main text color: 
-#BAA3CD		186,163,205
+#BAA3CD		186,163,205     0xBD19
 large swoop: 
-#D49E82		212,158,130
+#D49E82		212,158,130     0xD4F0
 data labels: 
-#7C516F		124,81,111
+#7C516F		124,81,111      0x7A8D
 subwindow frames: 
-#EC943A		236,148,58
+#EC943A		236,148,58      0xECA7
 active toggled button: 
-#C57C69		197,124,105
+#C57C69		197,124,105     0xC3ED
 main window title text:
-#C57C69		197,124,105
+#C57C69		197,124,105     0xC3ED
 
 /* VOY */
 main text color: 
-#99CCFF		153,204,255
+#99CCFF		153,204,255     0x9E7F
 large swoop: 
-#7A86A0		122,134,160
+#7A86A0		122,134,160     0x7C34
 data labels: 
-#9999FF		153,153,255
+#9999FF		153,153,255     0x9CDF
 subwindow frames 1: 
-#C3DCC7		195,220,199
+#C3DCC7		195,220,199     0xC6F8
 subwindow frames 2:
-#CC6699		204,102,152
+#CC6699		204,102,152     0xCB33
 active toggled button: 
-#FFCC66		255,244,122
+#FFCC66		255,244,122     0xFFAF
 main window title text:
-#FFCC66		255,244,122
+#FFCC66		255,244,122     0xFFAF
