@@ -164,11 +164,12 @@ void setup(void) {
   if (RGB_SENSOR_ACTIVE && rgbSensor.begin()) {
     drawParamText(60, 60, "RGB SENSOR CONNECTED", color_MAINTEXT);
   } else if (RGB_SENSOR_ACTIVE) {
-    Serial.println("No TCS34725 found ... check your connections");
+    //Serial.println("No TCS34725 found ... check your connections");
     drawParamText(60, 60, "NO RGB SENSOR - CHECK CONNECTION", color_MAINTEXT);
-    while (1);
-  } else if (!RGB_SENSOR_ACTIVE) {
+    //while (1);
+  } else if (!RGB_SENSOR_ACTIVE && rgbSensor.begin()) {
 	drawParamText(60, 60, "RGB SENSOR DISABLED", color_MAINTEXT);
+	rgbSensor.setInterrupt(true);
   }
 
   delay(1000);
@@ -261,10 +262,10 @@ void loop() {
 
 
   //delay(125);  
-	if (RGB_SENSOR_ACTIVE && nPwrReduced == 1) {
-		rgbSensor.setInterrupt(true);
-		tft.fillRect(60, 100, 170, 25, ST77XX_BLACK);
+	if (RGB_SENSOR_ACTIVE == true && nPwrReduced == 1) {	
 		rgbSensor.setInterrupt(false);
+		tft.fillRect(60, 100, 170, 25, ST77XX_BLACK);
+		
 		//everything from here down is color sensor
 		uint16_t r, g, b, c, colorTemp, lux;
 		float fRed, fGreen, fBlue;
@@ -281,6 +282,8 @@ void loop() {
 		strTempWr = const_cast<char*>(strTemp.c_str());
 
 	  drawParamText(60, 120, strTempWr, color_MAINTEXT);
+	  rgbSensor.setInterrupt(true);
+	  delay(200);
 	} else {
 		delay(125);
 	}
