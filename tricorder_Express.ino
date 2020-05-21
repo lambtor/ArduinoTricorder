@@ -1,36 +1,37 @@
-/**************************************************************************
-  This is a library for several Adafruit displays based on ST77* drivers.
-  The 2.0" TFT breakout
-        ----> https://www.adafruit.com/product/4311
- **************************************************************************/
-
 #include <Adafruit_GFX.h>    // Core graphics library
 #include <Adafruit_ST7789.h> // Hardware-specific library for ST7789
 #include <SPI.h>
 #include <string.h>
 #include <SD.h>
-//#include <Adafruit_SPIFlash.h>
-//#include <Adafruit_ImageReader.h>
 #include <Adafruit_NeoPixel.h>
 #include <Wire.h>
 #include <Adafruit_TCS34725.h>
+#include <EasyButton.h>
 
 // need to remove hyphens from header filenames or exception will get thrown
-//#include <Fonts/lcars24pt-7b.h>
-//#include "Fonts/lcars24pt7b.h"
+#include "Fonts/lcars15pt7b.h"
 #include "Fonts/lcars11pt7b.h"
 
 //rgb sensor setting - set to false if using a common cathode LED
-#define commonAnode true
-#define RGB_SENSOR_ACTIVE false
+#define RGB_SENSOR_ACTIVE true
 
 // For the breakout board, you can use any 2 or 3 pins.
 // These pins will also work for the 1.8" TFT shield.
-#define TFT_CS 9
+//need to use pin 10 for TFT_CS, as pin 9 is analog 7. analog 7 is the only way to get current voltage, which is used for battery %
+#define TFT_CS 10
+// SD card select pin
+//#define SD_CS 4
 #define TFT_RST 6
 #define TFT_DC 5
 #define USE_SD_CARD 1
-//pin 8 can pull power level (used for battery %)
+//pin 9 can pull power level (used for battery %)
+#define VOLT_PIN 9
+//buttons, scroller
+#define BUTTON_1_PIN		19
+#define BUTTON_2_PIN		12
+#define BUTTON_3_PIN		11
+#define SCROLLER_PIN_UP	14
+#define SCROLLER_PIN_DOWN	1
 
 // A0 is pin14. can't use that as an output pin?
 #define SCAN_LED_PIN_1 15
@@ -45,562 +46,614 @@
 #define NEOPIXEL_LED_COUNT 1
 
 Adafruit_NeoPixel ledPwrStrip(NEOPIXEL_LED_COUNT, POWER_LED_PIN, NEO_GRB + NEO_KHZ800);
-Adafruit_TCS34725 rgbSensor = Adafruit_TCS34725(TCS34725_INTEGRATIONTIME_700MS, TCS34725_GAIN_1X);
-
-// SD card select pin
-#define SD_CS 4
-
-#define BUFFPIXEL 20
-
-// card info works. getting conflicts with multiple attempts to reference shit
-// set up variables using the SD utility library functions:
-// Sd2Card card;
-// SdVolume volume;
-// SdFile root;
-
-// TNG colors here
-/*
-#define color_SWOOP       0xF7B3
-#define color_MAINTEXT    0xC69F
-#define color_LABELTEXT   0x841E
-#define color_HEADER      0xFEC8
-*/
-
-// ds9
-#define color_SWOOP 0xD4F0
-#define color_MAINTEXT 0xBD19
-#define color_LABELTEXT 0x7A8D
-#define color_HEADER 0xECA7
-
-// voy
-/*
-#define color_SWOOP       0x9E7F
-#define color_MAINTEXT    0x7C34
-#define color_LABELTEXT   0x9CDF
-#define color_HEADER      0xCB33
-*/
-
-// OPTION 1 (recommended) is to use the HARDWARE SPI pins, which are unique
-// to each board and not reassignable. For Arduino Uno: MOSI = pin 11 and
-// SCLK = pin 13. This is the fastest mode of operation and is required if
-// using the breakout board's microSD card.
-
+Adafruit_TCS34725 rgbSensor = Adafruit_TCS34725(TCS34725_INTEGRATIONTIME_50MS, TCS34725_GAIN_16X);
 // do not fuck with this. 2.0 IS THE BOARD
-// For 1.14", 1.3", 1.54", and 2.0" TFT with ST7789:
 Adafruit_ST7789 tft = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_RST);
-//Adafruit_Image oImg;
 
-int32_t nImgWidth = 0, // BMP image dimensions
-    nImgHeight = 0;
+//#define BUFFPIXEL 20
+// TNG colors here
+#define color_SWOOP		0xF7B3
+#define color_MAINTEXT		0xC69F
+#define color_LABELTEXT	0x841E
+#define color_HEADER		0xFEC8
+#define color_TITLETEXT	0xFEC8
+// ds9
+//#define color_SWOOP       0xD4F0
+//#define color_MAINTEXT    0xBD19
+//#define color_LABELTEXT   0x7A8D
+//#define color_HEADER      0xECA7
+//#define color_TITLETEXT	0xC3ED
+// voy
+//#define color_SWOOP       0x9E7F
+//#define color_MAINTEXT    0x7C34
+//#define color_LABELTEXT   0x9CDF
+//#define color_HEADER      0xCB33
+//#define color_TITLETEXT	0xFFAF
 
-float p = 3.1415926;
-int nFlag = 0;
 int nIterator = 1;
 int nScanCounter = 0;
 int nPwrCounter = 0;
-const int chipSelect = 4;
+bool mbRGBSensorStarted = false;
+bool mbRGBScreenActive = false;
+int mnLeftLEDInterval = 175;
+int mnPowerLEDInterval = 5000;
+int mnLeftLEDCurrent = 0;
+unsigned long mnLastUpdateLeftLED = 0;
+unsigned long mnLastUpdatePower = 0;
+unsigned long mnLastRGBScan = 0;
+int mnRGBScanInterval = 5000;
+bool mbRGBActive = false;
+//power color enumerator: blue = 4, green = 3, yellow = 2, orange = 1, red = 0
+int mnPowerColor = 4;
+//unsigned long mnLastUpdateButton1 = 0;
+//unsigned long mnLastUpdateButton2 = 0;
+//unsigned long mnLastUpdateButton3 = 0;
+int mnButtonMinThreshold = 50;
+//int mnLastButton1State = HIGH;
+//int mnLastButton2State = HIGH;
+//int mnCurrentButton2State = HIGH;
+//int mnLastButton3State = HIGH;
+boolean mbButton2Flag = false;
+EasyButton oButton2(BUTTON_2_PIN);
+
+#define RGBto565(r,g,b) ((((r) & 0xF8) << 8) | (((g) & 0xFC) << 3) | ((b) >> 3))
 
 void setup(void) {
-  ledPwrStrip.begin();
-  
-  Serial.print(F("Hello! ST77xx TFT Test"));
+	ledPwrStrip.begin();
 
-  // OR use this initializer (uncomment) if using a 2.0" 320x240 TFT:
-  tft.init(240, 320); // Init ST7789 320x240
+	// OR use this initializer (uncomment) if using a 2.0" 320x240 TFT:
+	tft.init(240, 320, SPI_MODE0); // Init ST7789 320x240
+	tft.setRotation(1);
+	tft.setFont(&lcars11pt7b);
+	//these googles, they do nothing!
+	tft.setTextWrap(false);
 
-  tft.setRotation(1);
-  Serial.println(F("Initialized"));
-
-  tft.setFont(&lcars11pt7b);
-  // tft.setRotation(1);
-
-  uint16_t time = millis();
-  // tft.fillScreen(ST77XX_BLACK);
-  time = millis() - time;
-
-  Serial.println(time, DEC);
-  delay(200);
-
-  // large block of text
-  tft.fillScreen(ST77XX_BLACK);
-  // header is 2 circles, then black rectangle to cut them, then header text
-  // then solid rect
-  tft.fillRoundRect(300, 4, 16, 16, 8, color_HEADER);
-  tft.fillRoundRect(3, 4, 16, 16, 8, color_HEADER);
-  tft.fillRect(12, 4, 4, 16, color_HEADER);
-  tft.fillRect(305, 4, 4, 16, color_HEADER);
-
-  tft.fillRect(15, 1, 290, 20, ST77XX_BLACK);
-  tft.fillRect(19, 4, 180, 16, color_HEADER);
-  drawParamText(204, 19, "TRICORDER LCARS", color_MAINTEXT);
-
-  char sWarningText[80];
-  strcpy(sWarningText, "");
-  // strcat(sWarningText, "\n");
-  strcat(sWarningText, "UNITED FEDERATION OF PLANETS");
-  // strcat(sWarningText, "\n");
-  // strcat(sWarningText, "UNAUTHORIZED USE DISCOURAGED");
-  // drawParamText(75, 200, sWarningText, color_MAINTEXT);
-
-  tft.fillRoundRect(3, 221, 16, 16, 8, color_HEADER);
-  tft.fillRect(12, 221, 4, 16, color_HEADER);
-  tft.fillRoundRect(300, 221, 16, 16, 8, color_HEADER);
-  tft.fillRect(305, 221, 4, 16, color_HEADER);
-
-  tft.fillRect(15, 221, 290, 20, ST77XX_BLACK);
-  // main header rect last
-  tft.fillRect(19, 221, 282, 16, color_HEADER);
-
-  drawWalkingText(75, 200, sWarningText, color_MAINTEXT);
-  //try bmp draw
-  
-  // tft.drawCircle(160, 120, 40, color_MAINTEXT);
-
-  // testdrawtext("HELLO PRIORITY ONE\n ARMADA!" , ST77XX_WHITE);
-  // testdrawtext("HELLO PRIORITY ONE\n ARMADA!" , 0xFF22);
-  // testfillrects(ST77XX_YELLOW, ST77XX_MAGENTA);
-  Serial.begin(9600);
-
-  if (RGB_SENSOR_ACTIVE && rgbSensor.begin()) {
-    drawParamText(60, 60, "RGB SENSOR CONNECTED", color_MAINTEXT);
-  } else if (RGB_SENSOR_ACTIVE) {
-    //Serial.println("No TCS34725 found ... check your connections");
-    drawParamText(60, 60, "NO RGB SENSOR - CHECK CONNECTION", color_MAINTEXT);
-    //while (1);
-  } else if (!RGB_SENSOR_ACTIVE && rgbSensor.begin()) {
-	drawParamText(60, 60, "RGB SENSOR DISABLED", color_MAINTEXT);
-	rgbSensor.setInterrupt(true);
-  }
-
-  delay(1000);
+	Serial.begin(9600);
+	oButton2.begin();
+	oButton2.onPressed(ToggleRGBSensor);
+	//setup scroller pins, buttons
+	//pinMode(SCROLLER_PIN_UP, INPUT);
+	//pinMode(SCROLLER_PIN_DOWN, INPUT);
+	
+	//manage sensor initialization here, NOT in home screen function
+	if (RGB_SENSOR_ACTIVE) {
+		mbRGBSensorStarted = rgbSensor.begin();
+		if (mbRGBSensorStarted) {
+			rgbSensor.setInterrupt(true);
+		}
+	}
+	//if camera active in config, begin camera?  
+	//if gps active in config, begin gps
+	
+	ledPwrStrip.clear();
+	// max brightness is 255
+	// ledStrip.setBrightness(255);
+	ledPwrStrip.setBrightness(32);
+	
+	GoHome();
+	delay(500);
 }
 
+//needs rewrite to use milliseconds instead of delay()
+//poll battery once per minute for power LED, numeric disp
 void loop() {
-
-  ledPwrStrip.clear();
-  // max brightness is 255
-  // ledStrip.setBrightness(255);
-  ledPwrStrip.setBrightness(32);
-  // to-do: calculate color based on power level.
-  // params for this call: led# (assumed you have multiple in a strip, this
-  // should always be 0), R G B 0-255. use 0-128 as high brightness will be PITA
-  // to look at blue >= 80%, green >= 60%, yellow >= 40%, orange >= 25%, red >=
-  // 0% need a way to test the color progression blue ledStrip.setPixelColor(0, 0, 0, 128); green
-  double nPwrReduced = nPwrCounter / 4;
-  if (nPwrReduced >= 0 && nPwrReduced < 2) {
-    ledPwrStrip.setPixelColor(0, 0, 0, 128);
-  } else if (nPwrReduced >= 2 && nPwrReduced < 4) {
-    ledPwrStrip.setPixelColor(0, 0, 160, 0);
-  } else if (nPwrReduced >= 4 && nPwrReduced < 6) {
-    // yellow
-    ledPwrStrip.setPixelColor(0, 128, 128, 0);
-  } else if (nPwrReduced >= 6 && nPwrReduced < 8) {
-    // orange
-    ledPwrStrip.setPixelColor(0, 160, 64, 0);
-  } else if (nPwrReduced >= 8) {
-    // red
-    ledPwrStrip.setPixelColor(0, 160, 0, 0);
-  }  
-  
-  // yellow-orange
-  // ledStrip.setPixelColor(0, 128, 80, 0);
-  ledPwrStrip.show();
-
-  // need to coordinate multiple LED and screen updates against single delay
-  // call
-  if (nScanCounter == 3) {
-    analogWrite(SCAN_LED_PIN_1, SCAN_LED_BRIGHTNESS);
-  } else {
-    analogWrite(SCAN_LED_PIN_1, 0);
-  }
-  if (nScanCounter == 2) {
-    analogWrite(SCAN_LED_PIN_2, SCAN_LED_BRIGHTNESS);
-  } else {
-    analogWrite(SCAN_LED_PIN_2, 0);
-  }
-  if (nScanCounter == 1) {
-    analogWrite(SCAN_LED_PIN_3, SCAN_LED_BRIGHTNESS);
-  } else {
-    analogWrite(SCAN_LED_PIN_3, 0);
-  }
-  if (nScanCounter == 0) {
-    analogWrite(SCAN_LED_PIN_4, SCAN_LED_BRIGHTNESS);
-  } else {
-    analogWrite(SCAN_LED_PIN_4, 0);
-  }
-  // analogWrite(SCAN_LED_PIN_2, 255);
-  // analogWrite(SCAN_LED_PIN_3, 255);
-  // analogWrite(SCAN_LED_PIN_4, 255);
-
-  if (nIterator != 1 && nIterator != 2) {
-    tft.invertDisplay(true);
-  } else if (nIterator == 1 || nIterator == 2) {
-    tft.invertDisplay(false);
-  }
-
-  // every iteration = 2, invertdisplay(true)
-  // every iteration = 1, invertdisplay(false)
-  // iteration cycles from 0 to 20
-
-  if (nIterator > 19) {
-    nIterator = 0;
-  } else {
-    nIterator += 1;
-  }
-
-  if (nScanCounter > 4) {
-    nScanCounter = 0;
-  } else {
-    nScanCounter += 1;
-  }
-
-  if (nPwrCounter > 40) {
-    nPwrCounter = 0;
-  } else {
-    nPwrCounter += 1;
-  }
-
-
-  //delay(125);  
-	if (RGB_SENSOR_ACTIVE == true && nPwrReduced == 1) {	
-		rgbSensor.setInterrupt(false);
-		tft.fillRect(60, 100, 170, 25, ST77XX_BLACK);
+	//this toggles RGB scanner
+	oButton2.read();
+		
+	//handle left side scanner led 	
+	LeftScanner();	
+	PowerColor();
+	
+	RunRGBSensor();
+	
+	/*
+	//prevent screen burn-in, or just make sure display shows that loop is running?
+	if (nIterator != 1 && nIterator != 2) {
+		tft.invertDisplay(true);
+	} else if (nIterator == 1 || nIterator == 2) {
+		tft.invertDisplay(false);
+	}
+ 
+ //need refactor to activate this on a button press or an independent counter?
+	if (RGB_SENSOR_ACTIVE && nPwrReduced == 1) {	
+		rgbSensor.setInterrupt(false);		
+		tft.fillRect(20, 80, 260, 30, ST77XX_BLACK);
+		tft.fillRoundRect(140, 140, 100, 50, 10, ST77XX_BLACK);
+		//delay here is set to 75 because sensor is 50ms. want delay to total the else case of 125.
+		delay(75);
 		
 		//everything from here down is color sensor
-		uint16_t r, g, b, c, colorTemp, lux;
+		//uint16_t r, g, b, c, colorTemp, lux;
 		float fRed, fGreen, fBlue;
-		
+		//need way to calculate HSL from HSL values, then set LUM to 75% and calculate RGB for THAT. 
+		//current readings are just a bit off.
 		rgbSensor.getRGB(&fRed, &fGreen, &fBlue);
 		
+		///convert rgb to HSL
+		double arrdHSL[2];
+		double arrdHSV[2];
+		double arrdRGB[2];
+		double arrdCMYK[3];
+		//RGBtoHSL((double)fRed, (double)fGreen, (double)fBlue, arrdHSL);
+		RGBtoHSV((double)fRed, (double)fGreen, (double)fBlue, arrdHSV);
+		//multiply sat by 1.2, convert it back to RGB for a more accurate sensor reading? colors are 20% dulled
+		arrdHSV[1] *= 1.3;
+		HSVtoRGB(arrdHSV[0], arrdHSV[1], arrdHSV[2], arrdRGB);
+		//uncomment this when need to display HSL conversion
+		//RGBtoHSL(arrdRGB[0], arrdRGB[1], arrdRGB[2], arrdHSL);
+		
+		//HSLtoRGB(arrdHSL[0], arrdHSL[1], arrdHSL[2], arrdRGB);
+		
+		//output HSL, RGB to display
+		uint16_t nRGB565 = RGBto565((int)arrdRGB[0], (int)arrdRGB[1], (int)arrdRGB[2]);
 		//use strings for all basic text, and only when outputting to screen, convert to char*
 		String strTemp = "COLOR ";
-		String strValues = "";
-		strValues = String((int)fRed) + " " + String((int)fGreen) + " " + String((int)fBlue);
-	  
-	  strTemp += strValues;
-	  char *strTempWr;
-		strTempWr = const_cast<char*>(strTemp.c_str());
+		drawParamText(20, 100, const_cast<char*>(strTemp.c_str()), color_LABELTEXT);
+		//strTemp = "";
+		strTemp = String((int)arrdRGB[0]) + " " + String((int)arrdRGB[1]) + " " + String((int)arrdRGB[2]) + " | ";
+		//strTemp += ", " + (String)nRGB565;		
+		if ((String((int)arrdRGB[0], HEX)).length() == 1) {
+			strTemp += "0" + String((int)arrdRGB[0], HEX);
+		} else {
+			strTemp += String((int)arrdRGB[0], HEX);
+		}
+		if ((String((int)arrdRGB[1], HEX)).length() == 1) {
+			strTemp += "0" + String((int)arrdRGB[1], HEX);
+		} else {
+			strTemp += String((int)arrdRGB[1], HEX);
+		}
+		if ((String((int)arrdRGB[2], HEX)).length() == 1) {
+			strTemp += "0" + String((int)arrdRGB[2], HEX);
+		} else {
+			strTemp += String((int)arrdRGB[2], HEX);
+		}
+		strTemp.toUpperCase();
+		strTemp += " | " + PrintHex16(&nRGB565);
+		
+		//CMYK conversion formulas assume all RGB are between 0-1.0
+		RGBtoCMYK(arrdRGB[0] / 255, arrdRGB[1] / 255, arrdRGB[2] / 255, arrdCMYK);
+		//fRed = arrdRGB[0] / 255;
+		//fGreen = arrdRGB[1] / 255;
+		//fBlue = arrdRGB[2] / 255;
+		//Black   = minimum(1-fRed, 1-fGreen, 1-fBlue)
+		//Cyan    = (1-fRed-Black)/(1-Black)
+		//Magenta = (1-fGreen-Black)/(1-Black)
+		//Yellow  = (1-fBlue-Black)/(1-Black) 
+		//strTemp = strValues;
+		//char *strTempWr;
+		//strTempWr = const_cast<char*>(strTemp.c_str());
 
-	  drawParamText(60, 120, strTempWr, color_MAINTEXT);
-	  rgbSensor.setInterrupt(true);
-	  delay(200);
+		drawParamText(80, 100, const_cast<char*>(strTemp.c_str()), color_MAINTEXT);
+
+		tft.fillRoundRect(140, 140, 100, 50, 10, nRGB565);
+		rgbSensor.setInterrupt(true);
+		//delay(20);
 	} else {
 		delay(125);
-	}
+	}*/
 
-}
-
-void drawLogo(char *filename, int16_t x, int16_t y) {
-	/*
-  File     bmpFile;
-  int      bmpWidth, bmpHeight;   // W+H in pixels
-  uint8_t  bmpDepth;              // Bit depth (currently must be 24)
-  uint32_t bmpImageoffset;        // Start of image data in file
-  uint32_t rowSize;               // Not always = bmpWidth; may have padding
-  uint8_t  sdbuffer[3*BUFFPIXEL]; // pixel buffer (R+G+B per pixel)
-  uint8_t  buffidx = sizeof(sdbuffer); // Current position in sdbuffer
-  boolean  goodBmp = false;       // Set to true on valid header parse
-  boolean  flip    = true;        // BMP is stored bottom-to-top
-  int      w, h, row, col, x2, y2, bx1, by1;
-  uint8_t  r, g, b;
-  uint32_t pos = 0, startTime = millis();
-
-  if((x >= tft.width()) || (y >= tft.height())) return;
-
-  Serial.println();
-  Serial.print(F("Loading image '"));
-  Serial.print(filename);
-  Serial.println('\'');
-
-  // Open requested file on SD card
-  if ((bmpFile = SD.open(filename)) == NULL) {
-    Serial.print(F("File not found"));
-    return;
-  }
-
-  // Parse BMP header
-  if(read16(bmpFile) == 0x4D42) { // BMP signature
-    Serial.print(F("File size: ")); 
-	Serial.println(read32(bmpFile));
-    (void)read32(bmpFile); // Read & ignore creator bytes
-    bmpImageoffset = read32(bmpFile); // Start of image data
-    Serial.print(F("Image Offset: ")); 
-	Serial.println(bmpImageoffset, DEC);
-    // Read DIB header
-    Serial.print(F("Header size: ")); 
-	Serial.println(read32(bmpFile));
-    bmpWidth  = read32(bmpFile);
-    bmpHeight = read32(bmpFile);
-	
-    if(read16(bmpFile) == 1) { // # planes -- must be '1'
-      bmpDepth = read16(bmpFile); // bits per pixel
-      Serial.print(F("Bit Depth: ")); Serial.println(bmpDepth);
-      if((bmpDepth == 24) && (read32(bmpFile) == 0)) { // 0 = uncompressed
-
-        goodBmp = true; // Supported BMP format -- proceed!
-        Serial.print(F("Image size: "));
-        Serial.print(bmpWidth);
-        Serial.print('x');
-        Serial.println(bmpHeight);
-
-        // BMP rows are padded (if needed) to 4-byte boundary
-        rowSize = (bmpWidth * 3 + 3) & ~3;
-
-        // If bmpHeight is negative, image is in top-down order.
-        // This is not canon but has been observed in the wild.
-        if(bmpHeight < 0) {
-          bmpHeight = -bmpHeight;
-          flip      = false;
-        }
-
-        // Crop area to be loaded
-        x2 = x + bmpWidth  - 1; // Lower-right corner
-        y2 = y + bmpHeight - 1;
-        if((x2 >= 0) && (y2 >= 0)) { // On screen?
-          w = bmpWidth; // Width/height of section to load/display
-          h = bmpHeight;
-          bx1 = by1 = 0; // UL coordinate in BMP file
-          if(x < 0) { // Clip left
-            bx1 = -x;
-            x   = 0;
-            w   = x2 + 1;
-          }
-          if(y < 0) { // Clip top
-            by1 = -y;
-            y   = 0;
-            h   = y2 + 1;
-          }
-          if(x2 >= tft.width())  w = tft.width()  - x; // Clip right
-          if(y2 >= tft.height()) h = tft.height() - y; // Clip bottom
-  
-          // Set TFT address window to clipped image bounds
-          tft.startWrite(); // Requires start/end transaction now
-          tft.setAddrWindow(x, y, w, h);
-  
-          for (row=0; row<h; row++) { // For each scanline...
-  
-            // Seek to start of scan line.  It might seem labor-
-            // intensive to be doing this on every line, but this
-            // method covers a lot of gritty details like cropping
-            // and scanline padding.  Also, the seek only takes
-            // place if the file position actually needs to change
-            // (avoids a lot of cluster math in SD library).
-            if(flip) // Bitmap is stored bottom-to-top order (normal BMP)
-              pos = bmpImageoffset + (bmpHeight - 1 - (row + by1)) * rowSize;
-            else     // Bitmap is stored top-to-bottom
-              pos = bmpImageoffset + (row + by1) * rowSize;
-            pos += bx1 * 3; // Factor in starting column (bx1)
-            if(bmpFile.position() != pos) { // Need seek?
-              tft.endWrite(); // End TFT transaction
-              bmpFile.seek(pos);
-              buffidx = sizeof(sdbuffer); // Force buffer reload
-              tft.startWrite(); // Start new TFT transaction
-            }
-            for (col=0; col<w; col++) { // For each pixel...
-              // Time to read more pixel data?
-              if (buffidx >= sizeof(sdbuffer)) { // Indeed
-                tft.endWrite(); // End TFT transaction
-                bmpFile.read(sdbuffer, sizeof(sdbuffer));
-                buffidx = 0; // Set index to beginning
-                tft.startWrite(); // Start new TFT transaction
-              }
-              // Convert pixel from BMP to TFT format, push to display
-              b = sdbuffer[buffidx++];
-              g = sdbuffer[buffidx++];
-              r = sdbuffer[buffidx++];
-              tft.writePixel(tft.color565(r,g,b));
-            } // end pixel
-          } // end scanline
-          tft.endWrite(); // End last TFT transaction
-        } // end onscreen
-        Serial.print(F("Loaded in "));
-        Serial.print(millis() - startTime);
-        Serial.println(" ms");
-      } // end goodBmp
-    }
-  }
-
-  bmpFile.close();
-  if(!goodBmp) Serial.println(F("BMP format not recognized."));*/
 }
 
 void drawParamText(uint8_t nPosX, uint8_t nPosY, char *sText, uint16_t nColor) {
-  tft.setCursor(nPosX, nPosY);
-  tft.setTextColor(nColor);
-  tft.setTextWrap(true);
-  tft.print(sText);
+	tft.setCursor(nPosX, nPosY);
+	tft.setTextColor(nColor);
+	tft.setTextWrap(true);
+	tft.print(sText);
 }
 
 void drawWalkingText(int nPosX, int nPosY, char *sText, uint16_t nColor) {
-  if (strlen(sText) == 0) {
-    return;
-  }
-  tft.setCursor(nPosX, nPosY);
-  tft.setTextColor(nColor);
-  tft.setTextWrap(true);
-  int i;
-  for (i = 0; i < strlen(sText); i++) {
-    tft.print(sText[i]);
-    delay(50);
-  }
-
-  // free(i);
+	if (strlen(sText) == 0) {
+		return;
+	}
+	tft.setCursor(nPosX, nPosY);
+	tft.setTextColor(nColor);
+	tft.setTextWrap(true);
+	int i;
+	for (i = 0; i < strlen(sText); i++) {
+		tft.print(sText[i]);
+		delay(50);
+	}
 }
 
-void testlines(uint16_t color) {
-  tft.fillScreen(ST77XX_BLACK);
-  for (int16_t x = 0; x < tft.width(); x += 6) {
-    tft.drawLine(0, 0, x, tft.height() - 1, color);
-    delay(0);
-  }
-  for (int16_t y = 0; y < tft.height(); y += 6) {
-    tft.drawLine(0, 0, tft.width() - 1, y, color);
-    delay(0);
-  }
+void RGBtoHSL(float r, float g, float b, double hsl[]) { 
+	//this assumes byte - need to divide by 255 to get byte?
+    //double rd = (double) r/255;
+    //double gd = (double) g/255;
+    //double bd = (double) b/255;
+	double rd = (double)r;
+	double gd = (double)g;
+	double bd = (double)b;
+    double max = threeway_max(rd, gd, bd);
+    double min = threeway_min(rd, gd, bd);
+    double h, s, l = (max + min) / 2;
 
-  tft.fillScreen(ST77XX_BLACK);
-  for (int16_t x = 0; x < tft.width(); x += 6) {
-    tft.drawLine(tft.width() - 1, 0, x, tft.height() - 1, color);
-    delay(0);
-  }
-  for (int16_t y = 0; y < tft.height(); y += 6) {
-    tft.drawLine(tft.width() - 1, 0, 0, y, color);
-    delay(0);
-  }
-
-  tft.fillScreen(ST77XX_BLACK);
-  for (int16_t x = 0; x < tft.width(); x += 6) {
-    tft.drawLine(0, tft.height() - 1, x, 0, color);
-    delay(0);
-  }
-  for (int16_t y = 0; y < tft.height(); y += 6) {
-    tft.drawLine(0, tft.height() - 1, tft.width() - 1, y, color);
-    delay(0);
-  }
-
-  tft.fillScreen(ST77XX_BLACK);
-  for (int16_t x = 0; x < tft.width(); x += 6) {
-    tft.drawLine(tft.width() - 1, tft.height() - 1, x, 0, color);
-    delay(0);
-  }
-  for (int16_t y = 0; y < tft.height(); y += 6) {
-    tft.drawLine(tft.width() - 1, tft.height() - 1, 0, y, color);
-    delay(0);
-  }
-}
-
-void testdrawtext(char *text, uint16_t color) {
-  tft.setCursor(0, 100);
-  tft.setTextColor(color);
-  tft.setTextWrap(true);
-  tft.print(text);
-}
-
-void testfastlines(uint16_t color1, uint16_t color2) {
-  tft.fillScreen(ST77XX_BLACK);
-  for (int16_t y = 0; y < tft.height(); y += 5) {
-    tft.drawFastHLine(0, y, tft.width(), color1);
-  }
-  for (int16_t x = 0; x < tft.width(); x += 5) {
-    tft.drawFastVLine(x, 0, tft.height(), color2);
-  }
-}
-
-void testdrawrects(uint16_t color) {
-  tft.fillScreen(ST77XX_BLACK);
-  for (int16_t x = 0; x < tft.width(); x += 6) {
-    tft.drawRect(tft.width() / 2 - x / 2, tft.height() / 2 - x / 2, x, x,
-                 color);
-  }
-}
-
-void testfillrects(uint16_t color1, uint16_t color2) {
-  tft.fillScreen(ST77XX_BLACK);
-  for (int16_t x = tft.width() - 1; x > 6; x -= 6) {
-    tft.fillRect(tft.width() / 2 - x / 2, tft.height() / 2 - x / 2, x, x,
-                 color1);
-    tft.drawRect(tft.width() / 2 - x / 2, tft.height() / 2 - x / 2, x, x,
-                 color2);
-  }
-}
-
-void testfillcircles(uint8_t radius, uint16_t color) {
-  for (int16_t x = radius; x < tft.width(); x += radius * 2) {
-    for (int16_t y = radius; y < tft.height(); y += radius * 2) {
-      tft.fillCircle(x, y, radius, color);
+    if (max == min) {
+        h = s = 0; // achromatic
+    } else {
+        double d = max - min;
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        if (max == rd) {
+            h = (gd - bd) / d + (gd < bd ? 6 : 0);
+        } else if (max == gd) {
+            h = (bd - rd) / d + 2;
+        } else if (max == bd) {
+            h = (rd - gd) / d + 4;
+        }
+        h /= 6;
     }
-  }
+    hsl[0] = h;
+    hsl[1] = s;
+    hsl[2] = l;
 }
 
-void testdrawcircles(uint8_t radius, uint16_t color) {
-  for (int16_t x = 0; x < tft.width() + radius; x += radius * 2) {
-    for (int16_t y = 0; y < tft.height() + radius; y += radius * 2) {
-      tft.drawCircle(x, y, radius, color);
+void HSLtoRGB(double h, double s, double l, double rgb[]) {
+    double r, g, b;	
+
+    if (s == 0) {
+        r = g = b = l; // achromatic
+    } else {
+        double q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+        double p = 2 * l - q;
+        r = hue2rgb(p, q, h + 1/3.0);
+        g = hue2rgb(p, q, h);
+        b = hue2rgb(p, q, h - 1/3.0);
     }
-  }
+
+    //rgb[0] = r * 255;
+    //rgb[1] = g * 255;
+    //rgb[2] = b * 255;
+	rgb[0] = r;
+	rgb[1] = g;
+	rgb[2] = b;
 }
 
-void testtriangles() {
-  tft.fillScreen(ST77XX_BLACK);
-  uint16_t color = 0xF800;
-  int t;
-  int w = tft.width() / 2;
-  int x = tft.height() - 1;
-  int y = 0;
-  int z = tft.width();
-  for (t = 0; t <= 15; t++) {
-    tft.drawTriangle(w, y, y, x, z, x, color);
-    x -= 4;
-    y += 4;
-    z -= 4;
-    color += 100;
-  }
+void RGBtoCMYK(double r, double g, double b, double cmyk[]) {
+	//fRed = arrdRGB[0] / 255;
+	//fGreen = arrdRGB[1] / 255;
+	//fBlue = arrdRGB[2] / 255;
+	cmyk[3] = threeway_min((1-r), (1-g), (1-b));
+	double dBlk = (1 - cmyk[3]);
+	cmyk[0] = (1 - r - cmyk[3]) / dBlk;
+	cmyk[1] = (1 - g - cmyk[3]) / dBlk;
+	cmyk[2] = (1 - b - cmyk[3]) / dBlk;
+	//Cyan    = (1-fRed-Black)/(1-Black)
+	//Magenta = (1-fGreen-Black)/(1-Black)
+	//Yellow  = (1-fBlue-Black)/(1-Black) 
 }
 
-void testroundrects() {
-  tft.fillScreen(ST77XX_BLACK);
-  uint16_t color = 100;
-  int i;
-  int t;
-  for (t = 0; t <= 4; t += 1) {
-    int x = 0;
-    int y = 0;
-    int w = tft.width() - 2;
-    int h = tft.height() - 2;
-    for (i = 0; i <= 16; i += 1) {
-      tft.drawRoundRect(x, y, w, h, 5, color);
-      x += 2;
-      y += 3;
-      w -= 4;
-      h -= 6;
-      color += 1100;
+double threeway_max(double a, double b, double c) {
+    return max(a, max(b, c));
+}
+
+double threeway_min(double a, double b, double c) {
+    return min(a, min(b, c));
+}
+
+double hue2rgb(double p, double q, double t) {
+    if(t < 0) t += 1;
+    if(t > 1) t -= 1;
+    if(t < 1/6.0) return p + (q - p) * 6 * t;
+    if(t < 1/2.0) return q;
+    if(t < 2/3.0) return p + (q - p) * (2/3.0 - t) * 6;
+    return p;
+}
+
+String PrintHex16(uint16_t *data) {
+   char tmp[16];
+   for (int i=0; i < 5; i++) { 
+	 sprintf(tmp, "0x%.4X",data[i]); 
+	 Serial.print(tmp); Serial.print(" ");
+   }
+   return (String)tmp;
+}
+
+void RGBtoHSV(float r, float g, float b, double hsv[]) {
+	double rd = r;
+	double gd = g;
+	double bd = b;
+    //double rd = (double) r/255;
+    //double gd = (double) g/255;
+    //double bd = (double) b/255;
+    double max = threeway_max(rd, gd, bd), min = threeway_min(rd, gd, bd);
+    double h, s, v = max;
+
+    double d = max - min;
+    s = max == 0 ? 0 : d / max;
+
+    if (max == min) { 
+        h = 0; // achromatic
+    } else {
+        if (max == rd) {
+            h = (gd - bd) / d + (gd < bd ? 6 : 0);
+        } else if (max == gd) {
+            h = (bd - rd) / d + 2;
+        } else if (max == bd) {
+            h = (rd - gd) / d + 4;
+        }
+        h /= 6;
     }
-    color += 100;
-  }
+
+    hsv[0] = h;
+    hsv[1] = s;
+    hsv[2] = v;
 }
 
+void HSVtoRGB(double h, double s, double v, double rgb[]) {
+    double r, g, b;
 
+    int i = int(h * 6);
+    double f = h * 6 - i;
+    double p = v * (1 - s);
+    double q = v * (1 - f * s);
+    double t = v * (1 - (1 - f) * s);
 
-char* string2char(String command){
-    if(command.length()!=0){
-        char *p = const_cast<char*>(command.c_str());
-        return p;
+    switch(i % 6){
+        case 0: r = v, g = t, b = p; break;
+        case 1: r = q, g = v, b = p; break;
+        case 2: r = p, g = v, b = t; break;
+        case 3: r = p, g = q, b = v; break;
+        case 4: r = t, g = p, b = v; break;
+        case 5: r = v, g = p, b = q; break;
     }
+
+    //rgb[0] = r * 255;
+    //rgb[1] = g * 255;
+    //rgb[2] = b * 255;
+	rgb[0] = r;
+	rgb[1] = g;
+	rgb[2] = b;
+}
+
+void GoHome() {
+	tft.setFont(&lcars11pt7b);
+
+	// large block of text
+	tft.fillScreen(ST77XX_BLACK);
+	// home screen header is 2 circles, then black rectangle to cut them, then header text
+	// then solid rect
+	tft.fillRoundRect(300, 4, 16, 16, 8, color_SWOOP);
+	tft.fillRoundRect(3, 4, 16, 16, 8, color_SWOOP);
+	tft.fillRect(12, 4, 4, 16, color_SWOOP);
+	tft.fillRect(305, 4, 4, 16, color_SWOOP);
+
+	tft.fillRect(15, 1, 290, 20, ST77XX_BLACK);
+	tft.fillRect(19, 4, 216, 16, color_SWOOP);
+	drawParamText(241, 19, "TRICORDER", color_MAINTEXT);
+
+	String sWarningText = "UNITED FEDERATION OF PLANETS";	
+
+	tft.fillRoundRect(3, 221, 16, 16, 8, color_SWOOP);
+	tft.fillRect(12, 221, 4, 16, color_SWOOP);
+	tft.fillRoundRect(300, 221, 16, 16, 8, color_SWOOP);
+	tft.fillRect(305, 221, 4, 16, color_SWOOP);
+
+	tft.fillRect(15, 221, 290, 20, ST77XX_BLACK);    
+	tft.fillRect(19, 221, 282, 16, color_SWOOP);  
+
+	//show sensor statuses
+	if (RGB_SENSOR_ACTIVE && mbRGBSensorStarted) {
+		//sWarningText = "CHROMATIC SENSOR";
+		//tft.getTextBounds(&sWarningText, 20, 54, &nTextPosX, &nTextPosY, &nTextWidth, &nTextHeight);
+		drawParamText(20, 54, "CHROMATICS", color_LABELTEXT);
+		drawParamText(95, 54, "ONLINE", color_MAINTEXT);		
+	} else if (RGB_SENSOR_ACTIVE) {
+		//Serial.println("No TCS34725 found ... check your connections");
+		drawParamText(20, 54, "CHROMATICS", color_LABELTEXT);
+		drawParamText(95, 54, "OFFLINE", color_MAINTEXT);
+	} else if (!RGB_SENSOR_ACTIVE && mbRGBSensorStarted) {
+		drawParamText(20, 54, "CHROMATICS", color_LABELTEXT);
+		drawParamText(95, 54, "DISABLED", color_MAINTEXT);
+		rgbSensor.setInterrupt(true);
+		//disable is possible here, but call will force LED on
+	}
+
+	ShowBatteryLevel(222, 54, color_LABELTEXT, color_MAINTEXT);
+	
+	//bottom crawling text	
+	drawWalkingText(75, 200, const_cast<char*>(sWarningText.c_str()), color_MAINTEXT);
+	//erase crawling text
+	//tft.fillRect(75, 180, 180, 25, ST77XX_BLACK);
+}
+
+void ShowBatteryLevel(int nPosX, int nPosY, uint16_t nLabelColor, uint16_t nValueColor) {
+	//to-do: use global setting to enable/disable battery voltage check
+	String sBatteryStatus = "";  
+	float fBattV = analogRead(VOLT_PIN);
+	//fBattV *= 2;    // we divided by 2 (board has a resistor on this pin), so multiply back,  // Multiply by 3.3V, our reference voltage
+	//fBattV *= 3.3; 
+	//combine previous actions for brevity- multiply by 2 to adjust for resistor, then 3.3 reference voltage
+	fBattV *= 6.6;
+	fBattV /= 1024; // convert to voltage
+	//3.3 to 4.2 => subtract 3.3 (0) from current voltage. now values should be in range of 0-0.9 : multiply by 1.111, then by 100, convert result to int.
+	fBattV -= 3.3;
+	fBattV *= 111.11;
+	//need to use space characters to pad string because it'll wrap back around to left edge when cursor set over 240 (height).
+	//this is a glitch of adafruit GFX library - it thinks display is 240x320 despite the rotation in setup() and setting for text wrap
+	sBatteryStatus = "      " + String((int)fBattV);
+	//carrBatteryStatus = const_cast<char*>(sBatteryStatus.c_str());
+	//tft.getTextBounds("POWER", 222, 54, &nTextPosX, &nTextPosY, &nTextWidth, &nTextHeight);
+	drawParamText(nPosX + 20, nPosY, const_cast<char*>(sBatteryStatus.c_str()), color_MAINTEXT);
+	
+	drawParamText(nPosX, nPosY, "POWER", color_LABELTEXT);
+}
+
+void LeftScanner() {
+	unsigned long lTimer = millis();
+	//to-do: add parameters to change cycle behavior of LEDs.
+	//ex: cycled down-> up, stacking, unified blink, KITT ping pong, etc
+	
+	if ((lTimer - mnLastUpdateLeftLED) > mnLeftLEDInterval) {		
+		switch (mnLeftLEDCurrent) {
+			case 1: analogWrite(SCAN_LED_PIN_1, 0); analogWrite(SCAN_LED_PIN_4, SCAN_LED_BRIGHTNESS); mnLeftLEDCurrent = 4; break;
+			case 2: analogWrite(SCAN_LED_PIN_2, 0); analogWrite(SCAN_LED_PIN_1, SCAN_LED_BRIGHTNESS); mnLeftLEDCurrent = 1; break;
+			case 3: analogWrite(SCAN_LED_PIN_3, 0); analogWrite(SCAN_LED_PIN_2, SCAN_LED_BRIGHTNESS); mnLeftLEDCurrent = 2; break;
+			default: analogWrite(SCAN_LED_PIN_4, 0); analogWrite(SCAN_LED_PIN_3, SCAN_LED_BRIGHTNESS); mnLeftLEDCurrent = 3; break;
+		}
+		mnLastUpdateLeftLED = lTimer;
+	}
+}
+
+void PowerColor() {
+	unsigned long lTimer = millis();
+	
+	if ((lTimer - mnLastUpdatePower) > mnPowerLEDInterval) {
+		//switch should eventually be changed to poll voltage pin
+		//cycle order = blue, green, yellow, orange, red
+		switch (mnPowerColor) {
+			case 4: ledPwrStrip.setPixelColor(0, 0, 0, 128); mnPowerColor = 3; break;
+			case 3: ledPwrStrip.setPixelColor(0, 0, 160, 0); mnPowerColor = 2; break;
+			case 2: ledPwrStrip.setPixelColor(0, 128, 128, 0); mnPowerColor = 1; break;
+			case 1: ledPwrStrip.setPixelColor(0, 160, 64, 0); mnPowerColor = 0; break;
+			default: ledPwrStrip.setPixelColor(0, 160, 0, 0); mnPowerColor = 4; break;
+		}
+		mnLastUpdatePower = lTimer;
+		ledPwrStrip.show();
+	}	
+}
+
+void ToggleRGBSensor() {
+	mbButton2Flag = !mbButton2Flag;
+	
+	if (mbButton2Flag) {
+		//to-do: if sensor disabled or not started, pulse message to display
+		if (!mbRGBActive) {
+			mbRGBActive = true;
+			//load rgb scanner screen - this is done once to improve perf
+			tft.fillScreen(ST77XX_BLACK);
+			tft.fillRoundRect(0, -25, 345, 140, 25, color_SWOOP);
+			tft.fillRoundRect(0, 120, 345, 140, 25, color_SWOOP);
+						
+			tft.fillRoundRect(50, -4, 275, 115, 5, ST77XX_BLACK);
+			tft.fillRoundRect(50, 124, 275, 125, 5, ST77XX_BLACK);
+			tft.fillRect(121, 110, 2, 16, ST77XX_BLACK);
+			tft.fillRect(241, 110, 2, 16, ST77XX_BLACK);
+			tft.fillRect(123, 114, 30, 7, ST77XX_BLACK);
+			tft.setFont(&lcars15pt7b);
+			drawParamText(184, 21, "CHROMATIC SCAN", color_TITLETEXT);
+			//data labels
+			tft.setFont(&lcars11pt7b);
+			drawParamText(112, 48, "RED", color_LABELTEXT);
+			drawParamText(112, 74, "GREEN", color_LABELTEXT);
+			drawParamText(112, 99, "BLUE", color_LABELTEXT);
+			
+			drawParamText(112, 150, "CYAN", color_LABELTEXT);
+			drawParamText(112, 176, "MAGENTA", color_LABELTEXT);
+			drawParamText(112, 202, "YELLOW", color_LABELTEXT);
+			drawParamText(112, 228, "KEY", color_LABELTEXT);
+			
+			drawParamText(237, 48, "HUE", color_LABELTEXT);
+			drawParamText(237, 74, "SATURATION", color_LABELTEXT);
+			drawParamText(237, 99, "LUMINOSITY", color_LABELTEXT);
+			
+			drawParamText(237, 150, "RGB565", color_LABELTEXT);
+			drawParamText(237, 176, "HEX", color_LABELTEXT);
+		} 
+		//Serial.println("button 2 yes flag");
+		//tft.fillRoundRect(140, 110, 100, 50, 10, ST77XX_YELLOW);
+		//
+	} else {
+		mbRGBActive = false;
+		
+		GoHome();
+		//Serial.println("button 2 no flag");
+		//tft.fillRoundRect(140, 110, 100, 50, 10, ST77XX_GREEN);
+	}
+}
+
+void RunRGBSensor() {
+	if (mbRGBActive) {		
+		//erase values if interval has passed
+		if (millis() - mnLastRGBScan > mnRGBScanInterval) {
+			tft.fillRect(175, 135, 59, 44, ST77XX_BLACK);
+			tft.fillRect(198, 31, 28, 70, ST77XX_BLACK);
+			tft.fillRect(74, 31, 30, 70, ST77XX_BLACK);
+			tft.fillRect(74, 135, 27, 95, ST77XX_BLACK);
+			//get values from sensor
+			rgbSensor.setInterrupt(false);					
+			
+			//delay here is set to 75 because sensor is 50ms. blocking is unavoidable here
+			delay(75);
+			
+			float fRed, fGreen, fBlue;
+			//need way to calculate HSL from HSL values, then set LUM to 75% and calculate RGB for THAT. 
+			//current readings are just a bit off.
+			rgbSensor.getRGB(&fRed, &fGreen, &fBlue);
+			
+			///convert rgb to HSL
+			double arrdHSL[2];
+			double arrdHSV[2];
+			double arrdRGB[2];
+			//RGBtoHSL((double)fRed, (double)fGreen, (double)fBlue, arrdHSL);
+			RGBtoHSV((double)fRed, (double)fGreen, (double)fBlue, arrdHSV);
+			//multiply sat by 1.2, convert it back to RGB for a more accurate sensor reading? colors are 20% dulled
+			arrdHSV[1] *= 1.3;
+			HSVtoRGB(arrdHSV[0], arrdHSV[1], arrdHSV[2], arrdRGB);
+			//displayRGB
+			drawParamText(78, 48, const_cast<char*>(String((int)arrdRGB[0]).c_str()), color_MAINTEXT);
+			drawParamText(78, 74, const_cast<char*>(String((int)arrdRGB[1]).c_str()), color_MAINTEXT);
+			drawParamText(78, 99, const_cast<char*>(String((int)arrdRGB[2]).c_str()), color_MAINTEXT);
+			
+			//uncomment this when need to display HSL conversion
+			RGBtoHSL(arrdRGB[0], arrdRGB[1], arrdRGB[2], arrdHSL);
+			//display HSL values
+			drawParamText(203, 48, const_cast<char*>(String((int)arrdHSV[0]).c_str()), color_MAINTEXT);
+			drawParamText(203, 74, const_cast<char*>(String((int)arrdHSV[1]).c_str()), color_MAINTEXT);
+			drawParamText(203, 99, const_cast<char*>(String((int)arrdHSV[2]).c_str()), color_MAINTEXT);
+						
+			//output HSL, RGB to display
+			uint16_t nRGB565 = RGBto565((int)arrdRGB[0], (int)arrdRGB[1], (int)arrdRGB[2]);
+			//use strings for all basic text, and only when outputting to screen, convert to char*
+			String strTemp = "";			
+			if ((String((int)arrdRGB[0], HEX)).length() == 1) {
+				strTemp += "0" + String((int)arrdRGB[0], HEX);
+			} else {
+				strTemp += String((int)arrdRGB[0], HEX);
+			}
+			if ((String((int)arrdRGB[1], HEX)).length() == 1) {
+				strTemp += "0" + String((int)arrdRGB[1], HEX);
+			} else {
+				strTemp += String((int)arrdRGB[1], HEX);
+			}
+			if ((String((int)arrdRGB[2], HEX)).length() == 1) {
+				strTemp += "0" + String((int)arrdRGB[2], HEX);
+			} else {
+				strTemp += String((int)arrdRGB[2], HEX);
+			}
+			//print HTML, RGB565			
+			strTemp.toUpperCase();
+			drawParamText(185, 176, const_cast<char*>(strTemp.c_str()), color_MAINTEXT);
+			strTemp = PrintHex16(&nRGB565);
+			drawParamText(185, 150, const_cast<char*>(strTemp.c_str()), color_MAINTEXT);
+			
+			//CMYK conversion formulas assume all RGB are between 0-1.0
+			fRed = arrdRGB[0] / 255;
+			fGreen = arrdRGB[1] / 255;
+			fBlue = arrdRGB[2] / 255;
+			
+			double dblack = (1 - threeway_max((double)fRed, (double)fGreen, (double)fBlue));
+			Serial.println(String(dblack));
+			strTemp = String((int)(dblack * 100));
+			drawParamText(78, 228, const_cast<char*>(strTemp.c_str()), color_MAINTEXT);
+			//use rgb array for cmy to minimize memory use
+			// red -> magenta, green -> yellow, blue -> cyan
+			arrdRGB[0] = ((1 - fGreen - dblack) / (1 - dblack)) * 100;
+			arrdRGB[2] = ((1 - fRed - dblack) / (1 - dblack)) * 100;
+			arrdRGB[1] = ((1 - fBlue - dblack) / (1 - dblack)) * 100; 
+			
+			drawParamText(78, 150, const_cast<char*>(String((int)arrdRGB[2]).c_str()), color_MAINTEXT);
+			drawParamText(78, 176, const_cast<char*>(String((int)arrdRGB[0]).c_str()), color_MAINTEXT);
+			drawParamText(78, 202, const_cast<char*>(String((int)arrdRGB[1]).c_str()), color_MAINTEXT);	
+			
+			//draw swatch
+			tft.fillRoundRect(186, 189, 113, 42, 10, nRGB565);
+			rgbSensor.setInterrupt(true);
+			
+			mnLastRGBScan = millis();
+		} else {
+			//give timer until next scan?
+		}
+	
+	}
 }
 
 
-uint16_t read16(File &f) {
-  uint16_t result;
-  ((uint8_t *)&result)[0] = f.read(); // LSB
-  ((uint8_t *)&result)[1] = f.read(); // MSB
-  return result;
-}
-
-uint32_t read32(File &f) {
-  uint32_t result;
-  ((uint8_t *)&result)[0] = f.read(); // LSB
-  ((uint8_t *)&result)[1] = f.read();
-  ((uint8_t *)&result)[2] = f.read();
-  ((uint8_t *)&result)[3] = f.read(); // MSB
-  return result;
-}
