@@ -152,85 +152,7 @@ void loop() {
 		tft.invertDisplay(true);
 	} else if (nIterator == 1 || nIterator == 2) {
 		tft.invertDisplay(false);
-	}
- 
- //need refactor to activate this on a button press or an independent counter?
-	if (RGB_SENSOR_ACTIVE && nPwrReduced == 1) {	
-		rgbSensor.setInterrupt(false);		
-		tft.fillRect(20, 80, 260, 30, ST77XX_BLACK);
-		tft.fillRoundRect(140, 140, 100, 50, 10, ST77XX_BLACK);
-		//delay here is set to 75 because sensor is 50ms. want delay to total the else case of 125.
-		delay(75);
-		
-		//everything from here down is color sensor
-		//uint16_t r, g, b, c, colorTemp, lux;
-		float fRed, fGreen, fBlue;
-		//need way to calculate HSL from HSL values, then set LUM to 75% and calculate RGB for THAT. 
-		//current readings are just a bit off.
-		rgbSensor.getRGB(&fRed, &fGreen, &fBlue);
-		
-		///convert rgb to HSL
-		double arrdHSL[2];
-		double arrdHSV[2];
-		double arrdRGB[2];
-		double arrdCMYK[3];
-		//RGBtoHSL((double)fRed, (double)fGreen, (double)fBlue, arrdHSL);
-		RGBtoHSV((double)fRed, (double)fGreen, (double)fBlue, arrdHSV);
-		//multiply sat by 1.2, convert it back to RGB for a more accurate sensor reading? colors are 20% dulled
-		arrdHSV[1] *= 1.3;
-		HSVtoRGB(arrdHSV[0], arrdHSV[1], arrdHSV[2], arrdRGB);
-		//uncomment this when need to display HSL conversion
-		//RGBtoHSL(arrdRGB[0], arrdRGB[1], arrdRGB[2], arrdHSL);
-		
-		//HSLtoRGB(arrdHSL[0], arrdHSL[1], arrdHSL[2], arrdRGB);
-		
-		//output HSL, RGB to display
-		uint16_t nRGB565 = RGBto565((int)arrdRGB[0], (int)arrdRGB[1], (int)arrdRGB[2]);
-		//use strings for all basic text, and only when outputting to screen, convert to char*
-		String strTemp = "COLOR ";
-		drawParamText(20, 100, const_cast<char*>(strTemp.c_str()), color_LABELTEXT);
-		//strTemp = "";
-		strTemp = String((int)arrdRGB[0]) + " " + String((int)arrdRGB[1]) + " " + String((int)arrdRGB[2]) + " | ";
-		//strTemp += ", " + (String)nRGB565;		
-		if ((String((int)arrdRGB[0], HEX)).length() == 1) {
-			strTemp += "0" + String((int)arrdRGB[0], HEX);
-		} else {
-			strTemp += String((int)arrdRGB[0], HEX);
-		}
-		if ((String((int)arrdRGB[1], HEX)).length() == 1) {
-			strTemp += "0" + String((int)arrdRGB[1], HEX);
-		} else {
-			strTemp += String((int)arrdRGB[1], HEX);
-		}
-		if ((String((int)arrdRGB[2], HEX)).length() == 1) {
-			strTemp += "0" + String((int)arrdRGB[2], HEX);
-		} else {
-			strTemp += String((int)arrdRGB[2], HEX);
-		}
-		strTemp.toUpperCase();
-		strTemp += " | " + PrintHex16(&nRGB565);
-		
-		//CMYK conversion formulas assume all RGB are between 0-1.0
-		RGBtoCMYK(arrdRGB[0] / 255, arrdRGB[1] / 255, arrdRGB[2] / 255, arrdCMYK);
-		//fRed = arrdRGB[0] / 255;
-		//fGreen = arrdRGB[1] / 255;
-		//fBlue = arrdRGB[2] / 255;
-		//Black   = minimum(1-fRed, 1-fGreen, 1-fBlue)
-		//Cyan    = (1-fRed-Black)/(1-Black)
-		//Magenta = (1-fGreen-Black)/(1-Black)
-		//Yellow  = (1-fBlue-Black)/(1-Black) 
-		//strTemp = strValues;
-		//char *strTempWr;
-		//strTempWr = const_cast<char*>(strTemp.c_str());
-
-		drawParamText(80, 100, const_cast<char*>(strTemp.c_str()), color_MAINTEXT);
-
-		tft.fillRoundRect(140, 140, 100, 50, 10, nRGB565);
-		rgbSensor.setInterrupt(true);
-		//delay(20);
-	} else {
-		delay(125);
-	}*/
+	} */
 
 }
 
@@ -257,15 +179,16 @@ void drawWalkingText(int nPosX, int nPosY, char *sText, uint16_t nColor) {
 
 void RGBtoHSL(float r, float g, float b, double hsl[]) { 
 	//this assumes byte - need to divide by 255 to get byte?
-    //double rd = (double) r/255;
-    //double gd = (double) g/255;
-    //double bd = (double) b/255;
-	double rd = (double)r;
-	double gd = (double)g;
-	double bd = (double)b;
+    double rd = (double) r/255;
+    double gd = (double) g/255;
+    double bd = (double) b/255;
+	//double rd = (double)r;
+	//double gd = (double)g;
+	//double bd = (double)b;
     double max = threeway_max(rd, gd, bd);
     double min = threeway_min(rd, gd, bd);
-    double h, s, l = (max + min) / 2;
+    double h, s;
+	double l = (max + min) / 2;
 
     if (max == min) {
         h = s = 0; // achromatic
@@ -281,9 +204,10 @@ void RGBtoHSL(float r, float g, float b, double hsl[]) {
         }
         h /= 6;
     }
-    hsl[0] = h;
-    hsl[1] = s;
-    hsl[2] = l;
+	//these values are factored 0-1. actual ranges are 0-360, 0-100, 0-100
+    hsl[0] = h * 360;
+    hsl[1] = s * 100;
+    hsl[2] = l * 100;
 }
 
 void HSLtoRGB(double h, double s, double l, double rgb[]) {
@@ -402,6 +326,22 @@ void HSVtoRGB(double h, double s, double v, double rgb[]) {
 	rgb[0] = r;
 	rgb[1] = g;
 	rgb[2] = b;
+}
+
+String TruncateDouble(double dInput) {
+	//badlypads to 3 digits. instead have a function to return pad pixel amount, use that in text print call - more precise this way.
+	int nInput = (int)dInput;
+	String sResult = (String)nInput;
+	return sResult;
+} 
+
+int GetBuffer(double dInput) {
+	if (dInput < 10) {
+		return 12;
+	} else if (dInput < 100) {
+		return 8;
+	} 
+	return 0;
 }
 
 void GoHome() {
@@ -525,8 +465,13 @@ void ToggleRGBSensor() {
 						
 			tft.fillRoundRect(50, -4, 275, 115, 5, ST77XX_BLACK);
 			tft.fillRoundRect(50, 124, 275, 125, 5, ST77XX_BLACK);
-			tft.fillRect(121, 110, 2, 16, ST77XX_BLACK);
-			tft.fillRect(241, 110, 2, 16, ST77XX_BLACK);
+			tft.drawFastVLine(121, 110, 16, ST77XX_BLACK);
+			tft.drawFastVLine(122, 110, 16, ST77XX_BLACK);
+			tft.drawFastVLine(241, 110, 16, ST77XX_BLACK);
+			tft.drawFastVLine(242, 110, 16, ST77XX_BLACK);
+			//tft.fillRect(121, 110, 2, 16, ST77XX_BLACK);
+			//tft.fillRect(241, 110, 2, 16, ST77XX_BLACK);
+			
 			tft.fillRect(123, 114, 30, 7, ST77XX_BLACK);
 			tft.setFont(&lcars15pt7b);
 			drawParamText(184, 21, "CHROMATIC SCAN", color_TITLETEXT);
@@ -572,7 +517,7 @@ void RunRGBSensor() {
 			rgbSensor.setInterrupt(false);					
 			
 			//delay here is set to 75 because sensor is 50ms. blocking is unavoidable here
-			delay(75);
+			delay(50);
 			
 			float fRed, fGreen, fBlue;
 			//need way to calculate HSL from HSL values, then set LUM to 75% and calculate RGB for THAT. 
@@ -589,16 +534,19 @@ void RunRGBSensor() {
 			arrdHSV[1] *= 1.3;
 			HSVtoRGB(arrdHSV[0], arrdHSV[1], arrdHSV[2], arrdRGB);
 			//displayRGB
-			drawParamText(78, 48, const_cast<char*>(String((int)arrdRGB[0]).c_str()), color_MAINTEXT);
-			drawParamText(78, 74, const_cast<char*>(String((int)arrdRGB[1]).c_str()), color_MAINTEXT);
-			drawParamText(78, 99, const_cast<char*>(String((int)arrdRGB[2]).c_str()), color_MAINTEXT);
+			drawParamText(78 + GetBuffer(arrdRGB[0]), 48, const_cast<char*>(TruncateDouble(arrdRGB[0]).c_str()), color_MAINTEXT);
+			drawParamText(78 + GetBuffer(arrdRGB[1]), 74, const_cast<char*>(TruncateDouble(arrdRGB[1]).c_str()), color_MAINTEXT);
+			drawParamText(78 + GetBuffer(arrdRGB[2]), 99, const_cast<char*>(TruncateDouble(arrdRGB[2]).c_str()), color_MAINTEXT);
 			
 			//uncomment this when need to display HSL conversion
 			RGBtoHSL(arrdRGB[0], arrdRGB[1], arrdRGB[2], arrdHSL);
 			//display HSL values
-			drawParamText(203, 48, const_cast<char*>(String((int)arrdHSV[0]).c_str()), color_MAINTEXT);
-			drawParamText(203, 74, const_cast<char*>(String((int)arrdHSV[1]).c_str()), color_MAINTEXT);
-			drawParamText(203, 99, const_cast<char*>(String((int)arrdHSV[2]).c_str()), color_MAINTEXT);
+			drawParamText(203 + GetBuffer(arrdHSL[0]), 48, const_cast<char*>(TruncateDouble(arrdHSL[0]).c_str()), color_MAINTEXT);
+			drawParamText(203 + GetBuffer(arrdHSL[1]), 74, const_cast<char*>(TruncateDouble(arrdHSL[1]).c_str()), color_MAINTEXT);
+			drawParamText(203 + GetBuffer(arrdHSL[2]), 99, const_cast<char*>(TruncateDouble(arrdHSL[2]).c_str()), color_MAINTEXT);
+			
+			//free(arrdHSL);
+			//free(arrdHSV);
 						
 			//output HSL, RGB to display
 			uint16_t nRGB565 = RGBto565((int)arrdRGB[0], (int)arrdRGB[1], (int)arrdRGB[2]);
@@ -626,27 +574,38 @@ void RunRGBSensor() {
 			drawParamText(185, 150, const_cast<char*>(strTemp.c_str()), color_MAINTEXT);
 			
 			//CMYK conversion formulas assume all RGB are between 0-1.0
+			//this should use CMYK function
+			//double arrdCMYK[3];
+			//RGBtoCMYK(arrdRGB[0], arrdRGB[1], arrdRGB[2], arrdCMYK);
+			//drawParamText(78, 150, const_cast<char*>(LeftPadAndTruncate(arrdCMYK[2]).c_str()), color_MAINTEXT);
+			//drawParamText(78, 176, const_cast<char*>(LeftPadAndTruncate(arrdCMYK[0]).c_str()), color_MAINTEXT);
+			//drawParamText(78, 202, const_cast<char*>(LeftPadAndTruncate(arrdCMYK[1]).c_str()), color_MAINTEXT);	
+			//drawParamText(78, 228, const_cast<char*>(LeftPadAndTruncate(arrdCMYK[3]).c_str()), color_MAINTEXT);	
+			
 			fRed = arrdRGB[0] / 255;
 			fGreen = arrdRGB[1] / 255;
-			fBlue = arrdRGB[2] / 255;
+			fBlue = arrdRGB[2] / 255;			
 			
 			double dblack = (1 - threeway_max((double)fRed, (double)fGreen, (double)fBlue));
-			Serial.println(String(dblack));
-			strTemp = String((int)(dblack * 100));
-			drawParamText(78, 228, const_cast<char*>(strTemp.c_str()), color_MAINTEXT);
+			//Serial.println(String(dblack));
+			//strTemp = String((int)(dblack * 100));
+			drawParamText(78 + GetBuffer(dblack *100), 228, const_cast<char*>(TruncateDouble(dblack * 100).c_str()), color_MAINTEXT);
 			//use rgb array for cmy to minimize memory use
 			// red -> magenta, green -> yellow, blue -> cyan
 			arrdRGB[0] = ((1 - fGreen - dblack) / (1 - dblack)) * 100;
 			arrdRGB[2] = ((1 - fRed - dblack) / (1 - dblack)) * 100;
 			arrdRGB[1] = ((1 - fBlue - dblack) / (1 - dblack)) * 100; 
 			
-			drawParamText(78, 150, const_cast<char*>(String((int)arrdRGB[2]).c_str()), color_MAINTEXT);
-			drawParamText(78, 176, const_cast<char*>(String((int)arrdRGB[0]).c_str()), color_MAINTEXT);
-			drawParamText(78, 202, const_cast<char*>(String((int)arrdRGB[1]).c_str()), color_MAINTEXT);	
+			drawParamText(78 + GetBuffer(arrdRGB[2]), 150, const_cast<char*>(TruncateDouble(arrdRGB[2]).c_str()), color_MAINTEXT);
+			drawParamText(78 + GetBuffer(arrdRGB[0]), 176, const_cast<char*>(TruncateDouble(arrdRGB[0]).c_str()), color_MAINTEXT);
+			drawParamText(78 + GetBuffer(arrdRGB[1]), 202, const_cast<char*>(TruncateDouble(arrdRGB[1]).c_str()), color_MAINTEXT);	
 			
-			//draw swatch
+			
+			//draw swatch, turn off scanner LED
 			tft.fillRoundRect(186, 189, 113, 42, 10, nRGB565);
 			rgbSensor.setInterrupt(true);
+			
+			//free(arrdRGB);
 			
 			mnLastRGBScan = millis();
 		} else {
