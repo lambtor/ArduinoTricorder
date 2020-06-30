@@ -5,6 +5,7 @@
 #include <SD.h>
 #include <Adafruit_NeoPixel.h>
 #include <Wire.h>
+//this is rgb sensor
 #include <Adafruit_TCS34725.h>
 #include <EasyButton.h>
 
@@ -21,7 +22,7 @@
 #define TFT_CS 10
 // SD card select pin
 //#define SD_CS 4
-#define TFT_RST 6
+#define TFT_RST -1
 #define TFT_DC 5
 #define USE_SD_CARD 1
 //pin 9 can pull power level (used for battery %)
@@ -42,7 +43,7 @@
 
 // power LED. must use an unreserved pin for this.
 // cdn-learn.adafruit.com/assets/assets/000/046/243/large1024/adafruit_products_Feather_M0_Adalogger_v2.2-1.png?1504885273
-#define POWER_LED_PIN 0
+#define POWER_LED_PIN 6
 #define NEOPIXEL_LED_COUNT 1
 
 Adafruit_NeoPixel ledPwrStrip(NEOPIXEL_LED_COUNT, POWER_LED_PIN, NEO_GRB + NEO_KHZ800);
@@ -82,6 +83,7 @@ unsigned long mnLastUpdateLeftLED = 0;
 unsigned long mnLastUpdatePower = 0;
 unsigned long mnLastRGBScan = 0;
 int mnRGBScanInterval = 5000;
+int mnRGBCooldown = 0;
 bool mbRGBActive = false;
 //power color enumerator: blue = 4, green = 3, yellow = 2, orange = 1, red = 0
 int mnPowerColor = 4;
@@ -98,7 +100,7 @@ EasyButton oButton2(BUTTON_2_PIN);
 
 #define RGBto565(r,g,b) ((((r) & 0xF8) << 8) | (((g) & 0xFC) << 3) | ((b) >> 3))
 
-void setup(void) {
+void setup() {
 	ledPwrStrip.begin();
 
 	// OR use this initializer (uncomment) if using a 2.0" 320x240 TFT:
@@ -164,6 +166,7 @@ void drawParamText(uint8_t nPosX, uint8_t nPosY, char *sText, uint16_t nColor) {
 }
 
 void drawWalkingText(int nPosX, int nPosY, char *sText, uint16_t nColor) {
+	//this needs a refactor eventually, as it will block due to delay()
 	if (strlen(sText) == 0) {
 		return;
 	}
@@ -218,9 +221,9 @@ void HSLtoRGB(double h, double s, double l, double rgb[]) {
     } else {
         double q = l < 0.5 ? l * (1 + s) : l + s - l * s;
         double p = 2 * l - q;
-        r = hue2rgb(p, q, h + 1/3.0);
-        g = hue2rgb(p, q, h);
-        b = hue2rgb(p, q, h - 1/3.0);
+        r = HUEtoRGB(p, q, h + 1/3.0);
+        g = HUEtoRGB(p, q, h);
+        b = HUEtoRGB(p, q, h - 1/3.0);
     }
 
     //rgb[0] = r * 255;
@@ -253,7 +256,7 @@ double threeway_min(double a, double b, double c) {
     return min(a, min(b, c));
 }
 
-double hue2rgb(double p, double q, double t) {
+double HUEtoRGB(double p, double q, double t) {
     if(t < 0) t += 1;
     if(t > 1) t -= 1;
     if(t < 1/6.0) return p + (q - p) * 6 * t;
@@ -337,7 +340,7 @@ String TruncateDouble(double dInput) {
 
 int GetBuffer(double dInput) {
 	if (dInput < 10) {
-		return 12;
+		return 14;
 	} else if (dInput < 100) {
 		return 8;
 	} 
@@ -349,32 +352,31 @@ void GoHome() {
 
 	// large block of text
 	tft.fillScreen(ST77XX_BLACK);
-	// home screen header is 2 circles, then black rectangle to cut them, then header text
-	// then solid rect
-	tft.fillRoundRect(300, 4, 16, 16, 8, color_SWOOP);
-	tft.fillRoundRect(3, 4, 16, 16, 8, color_SWOOP);
-	tft.fillRect(12, 4, 4, 16, color_SWOOP);
-	tft.fillRect(305, 4, 4, 16, color_SWOOP);
+	// home screen header is 2 rounded rectangles, lines to cut them, 1 black rect as backing for header text
+	tft.fillRoundRect(3, 4, 316, 16, 8, color_SWOOP);
+	tft.fillRoundRect(3, 221, 316, 16, 8, color_SWOOP);
+	//left side slots
+	tft.drawFastVLine(15, 4, 312, ST77XX_BLACK);
+	tft.drawFastVLine(16, 4, 312, ST77XX_BLACK);
+	tft.drawFastVLine(17, 4, 312, ST77XX_BLACK);
+	tft.drawFastVLine(18, 4, 312, ST77XX_BLACK);
+	//bottom right slots
+	tft.drawFastVLine(305, 221, 16, ST77XX_BLACK);
+	tft.drawFastVLine(304, 221, 16, ST77XX_BLACK);
+	tft.drawFastVLine(303, 221, 16, ST77XX_BLACK);
+	tft.drawFastVLine(302, 221, 16, ST77XX_BLACK);
 
-	tft.fillRect(15, 1, 290, 20, ST77XX_BLACK);
-	tft.fillRect(19, 4, 216, 16, color_SWOOP);
-	drawParamText(241, 19, "TRICORDER", color_MAINTEXT);
+	tft.fillRect(255, 4, 50, 16, ST77XX_BLACK);
+	drawParamText(252, 19, "  STATUS", color_MAINTEXT);
 
 	String sWarningText = "UNITED FEDERATION OF PLANETS";	
-
-	tft.fillRoundRect(3, 221, 16, 16, 8, color_SWOOP);
-	tft.fillRect(12, 221, 4, 16, color_SWOOP);
-	tft.fillRoundRect(300, 221, 16, 16, 8, color_SWOOP);
-	tft.fillRect(305, 221, 4, 16, color_SWOOP);
-
-	tft.fillRect(15, 221, 290, 20, ST77XX_BLACK);    
-	tft.fillRect(19, 221, 282, 16, color_SWOOP);  
 
 	//show sensor statuses
 	if (RGB_SENSOR_ACTIVE && mbRGBSensorStarted) {
 		//sWarningText = "CHROMATIC SENSOR";
 		//tft.getTextBounds(&sWarningText, 20, 54, &nTextPosX, &nTextPosY, &nTextWidth, &nTextHeight);
 		drawParamText(20, 54, "CHROMATICS", color_LABELTEXT);
+		//drawWalkingText(95, 54, "ONLINE", color_MAINTEXT);		
 		drawParamText(95, 54, "ONLINE", color_MAINTEXT);		
 	} else if (RGB_SENSOR_ACTIVE) {
 		//Serial.println("No TCS34725 found ... check your connections");
@@ -390,7 +392,8 @@ void GoHome() {
 	ShowBatteryLevel(222, 54, color_LABELTEXT, color_MAINTEXT);
 	
 	//bottom crawling text	
-	drawWalkingText(75, 200, const_cast<char*>(sWarningText.c_str()), color_MAINTEXT);
+	//drawWalkingText(75, 200, const_cast<char*>(sWarningText.c_str()), color_MAINTEXT);
+	drawParamText(75, 200, const_cast<char*>(sWarningText.c_str()), color_MAINTEXT);
 	//erase crawling text
 	//tft.fillRect(75, 180, 180, 25, ST77XX_BLACK);
 }
@@ -460,19 +463,36 @@ void ToggleRGBSensor() {
 			mbRGBActive = true;
 			//load rgb scanner screen - this is done once to improve perf
 			tft.fillScreen(ST77XX_BLACK);
-			tft.fillRoundRect(0, -25, 345, 140, 25, color_SWOOP);
-			tft.fillRoundRect(0, 120, 345, 140, 25, color_SWOOP);
+			tft.fillRoundRect(0, -25, 100, 140, 25, color_SWOOP);
+			tft.fillRoundRect(0, 120, 100, 140, 25, color_SWOOP);
+			tft.drawFastHLine(25, 112, 295, color_SWOOP);
+			tft.drawFastHLine(25, 113, 295, color_SWOOP);
+			tft.drawFastHLine(25, 114, 295, color_SWOOP);
+			tft.drawFastHLine(25, 115, 295, color_SWOOP);		
+			
+			tft.drawFastHLine(25, 120, 295, color_SWOOP);
+			tft.drawFastHLine(25, 121, 295, color_SWOOP);
+			tft.drawFastHLine(25, 122, 295, color_SWOOP);
+			tft.drawFastHLine(25, 123, 295, color_SWOOP);			
 						
-			tft.fillRoundRect(50, -4, 275, 115, 5, ST77XX_BLACK);
-			tft.fillRoundRect(50, 124, 275, 125, 5, ST77XX_BLACK);
+			tft.fillRoundRect(50, -3, 60, 115, 5, ST77XX_BLACK);
+			tft.fillRoundRect(50, 124, 60, 125, 5, ST77XX_BLACK);
 			tft.drawFastVLine(121, 110, 16, ST77XX_BLACK);
 			tft.drawFastVLine(122, 110, 16, ST77XX_BLACK);
 			tft.drawFastVLine(241, 110, 16, ST77XX_BLACK);
 			tft.drawFastVLine(242, 110, 16, ST77XX_BLACK);
-			//tft.fillRect(121, 110, 2, 16, ST77XX_BLACK);
+			
+			//previously was 49,50 for top edge of timer
+			tft.drawFastHLine(0, 28, 50, ST77XX_BLACK);
+			tft.drawFastHLine(0, 29, 50, ST77XX_BLACK);
+			tft.drawFastHLine(0, 30, 50, ST77XX_BLACK);
+			tft.fillRect(0, 31, 50, 46, color_HEADER);
+			tft.drawFastHLine(0, 77, 50, ST77XX_BLACK);
+			tft.drawFastHLine(0, 78, 50, ST77XX_BLACK);
+			tft.drawFastHLine(0, 79, 50, ST77XX_BLACK);
 			//tft.fillRect(241, 110, 2, 16, ST77XX_BLACK);
 			
-			tft.fillRect(123, 114, 30, 7, ST77XX_BLACK);
+			tft.fillRect(123, 114, 30, 8, ST77XX_BLACK);
 			tft.setFont(&lcars15pt7b);
 			drawParamText(184, 21, "CHROMATIC SCAN", color_TITLETEXT);
 			//data labels
@@ -500,6 +520,7 @@ void ToggleRGBSensor() {
 		mbRGBActive = false;
 		
 		GoHome();
+		mnRGBCooldown = 0;
 		//Serial.println("button 2 no flag");
 		//tft.fillRoundRect(140, 110, 100, 50, 10, ST77XX_GREEN);
 	}
@@ -523,6 +544,17 @@ void RunRGBSensor() {
 			//need way to calculate HSL from HSL values, then set LUM to 75% and calculate RGB for THAT. 
 			//current readings are just a bit off.
 			rgbSensor.getRGB(&fRed, &fGreen, &fBlue);
+			
+			//need a sanity test to prevent weird readings from destroying display			
+			if (fRed < 0 || fRed > 255 || fGreen < 0 || fGreen > 255 || fBlue < 0 || fBlue > 255) {
+				//to-do: create full error screen in redalert color scheme
+				tft.fillRoundRect(186, 189, 113, 42, 10, ST77XX_WHITE);
+				drawParamText(223, 228, "SCAN ERROR", ST77XX_BLACK);
+				rgbSensor.setInterrupt(true);
+				//write zeroes to all values?
+				mnLastRGBScan = millis();
+				return;
+			}
 			
 			///convert rgb to HSL
 			double arrdHSL[2];
@@ -610,9 +642,16 @@ void RunRGBSensor() {
 			mnLastRGBScan = millis();
 		} else {
 			//give timer until next scan?
+			//37 58		6 14
+			int nCurrentRGBCooldown = (mnRGBScanInterval / 1000) - (int)((millis() - mnLastRGBScan) / 1000);
+			if (nCurrentRGBCooldown != mnRGBCooldown && nCurrentRGBCooldown < 5) {
+				mnRGBCooldown = nCurrentRGBCooldown;
+				tft.fillRect(37, 55, 7, 18, color_HEADER);
+				if (mnRGBCooldown > 0) {
+					drawParamText(37, 71, const_cast<char*>(((String)mnRGBCooldown).c_str()), ST77XX_BLACK);
+				}
+			}
 		}
 	
 	}
 }
-
-
