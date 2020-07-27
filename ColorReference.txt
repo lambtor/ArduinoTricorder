@@ -20,6 +20,8 @@ active toggled button (yellow):
 #F8D941		248,217,65      0xFEC8
 main window title text:
 #F8D941		248,217,65      0xFEC8
+alternate text (purple):
+#C8AEDE		200,174,222     0xCD7B
 
 /* RED ALERT */
 main text color: 
