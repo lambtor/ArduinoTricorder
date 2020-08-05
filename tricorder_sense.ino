@@ -351,6 +351,17 @@ void GoHome() {
 
 void ToggleRGBSensor() {
 	mbButton2Flag = !mbButton2Flag;
+	//reset any temperature app values
+	mbTempActive = false;
+	mnTempTargetBar = 0;
+	mnTempCurrentBar = 0;
+	mnHumidTargetBar = 0;
+	mnHumidCurrentBar = 0;
+	mnBaromTargetBar = 0;
+	mnBaromCurrentBar = 0;
+	mbHumidBarComplete = false;
+	mbTempBarComplete = false;
+	mbBaromBarComplete = false;
 	
 	if (mbButton2Flag) {
 		//to-do: if sensor disabled or not started, pulse message to display
@@ -568,6 +579,10 @@ void ShowBatteryLevel(int nPosX, int nPosY, uint16_t nLabelColor, uint16_t nValu
 
 void ToggleClimateSensor() {
 	mbButton1Flag = !mbButton1Flag;
+	//reset any rgb sensor values
+	mnRGBCooldown = 0;
+	mnClimateCooldown = 0;	
+	mbRGBActive = false;
 	
 	if (mbButton1Flag) {
 		if (!mbTempActive) {
