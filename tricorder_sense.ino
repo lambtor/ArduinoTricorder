@@ -33,10 +33,10 @@
 #define BUTTON_3_PIN		2
 
 // A0 is pin14. can't use that as an output pin?		A0 = 14, A3 = 17
-#define SCAN_LED_PIN_1 14
-#define SCAN_LED_PIN_2 15
-#define SCAN_LED_PIN_3 16
-#define SCAN_LED_PIN_4 17
+#define SCAN_LED_PIN_1 PIN_A0	//14
+#define SCAN_LED_PIN_2 PIN_A1	//15
+#define SCAN_LED_PIN_3 PIN_A2	//16
+#define SCAN_LED_PIN_4 PIN_A3	//17
 
 #define SCAN_LED_BRIGHTNESS 128
 
@@ -118,7 +118,7 @@ float mfTempC = 0.0;
 float mfTempK = 0.0;
 float mfHumid = 0.0;
 int mnBarom = 0;
-int mnClimateScanInterval = 3000;
+int mnClimateScanInterval = 2000;
 int mnClimateCooldown = 0;
 int mnTempTargetBar = 0;
 int mnTempCurrentBar = 0;
@@ -127,6 +127,10 @@ int mnHumidCurrentBar = 0;
 int mnBaromTargetBar = 0;
 int mnBaromCurrentBar = 0;
 int mnClimateBarStart = 62;
+unsigned long mnLastTempBar = 0;
+unsigned long mnLastBaromBar = 0;
+unsigned long mnLastHumidBar = 0;
+unsigned long mnBarDrawInterval = 17;
 bool mbHumidBarComplete = false;
 bool mbTempBarComplete = false;
 bool mbBaromBarComplete = false;
@@ -1017,9 +1021,10 @@ void UpdateClimateBarGraph(int nBarIndex, uint16_t nBarColor) {
 	int nHumidBarX = 0;
 	int nTempBarX = 0;
 	int nBaromBarX = 0;
+	
 	switch (nBarIndex) {
 		case 0:
-			if (mbTempBarComplete) break;
+			if (mbTempBarComplete || (millis() - mnLastTempBar < mnBarDrawInterval)) break;
 			nTempBarX = 61 + mnTempCurrentBar;
 			if (mnTempCurrentBar < mnTempTargetBar) {				
 				tft.drawFastVLine(nTempBarX, 113, 15, nBarColor);
@@ -1037,9 +1042,10 @@ void UpdateClimateBarGraph(int nBarIndex, uint16_t nBarColor) {
 				//flag bar drawing complete
 				mbTempBarComplete = true;
 			}
+			mnLastTempBar = millis();
 			break;
 		case 1:
-			if (mbHumidBarComplete) break;
+			if (mbHumidBarComplete || (millis() - mnLastHumidBar < mnBarDrawInterval)) break;
 			nHumidBarX = 61 + mnHumidCurrentBar;
 			if (mnHumidCurrentBar < mnHumidTargetBar) {				
 				tft.drawFastVLine(nHumidBarX, 159, 15, nBarColor);
@@ -1057,9 +1063,10 @@ void UpdateClimateBarGraph(int nBarIndex, uint16_t nBarColor) {
 				//flag bar drawing complete
 				mbHumidBarComplete = true;
 			}
+			mnLastHumidBar = millis();
 			break;
 		case 2:
-			if (mbBaromBarComplete) break;
+			if (mbBaromBarComplete || (millis() - mnLastBaromBar < mnBarDrawInterval)) break;
 			nBaromBarX = 61 + mnBaromCurrentBar;
 			if (mnBaromCurrentBar < mnBaromTargetBar) {				
 				tft.drawFastVLine(nBaromBarX, 205, 15, nBarColor);
@@ -1077,6 +1084,7 @@ void UpdateClimateBarGraph(int nBarIndex, uint16_t nBarColor) {
 				//flag bar drawing complete
 				mbBaromBarComplete = true;
 			}
+			mnLastBaromBar = millis();
 			break;
 		default: break;
 	}
