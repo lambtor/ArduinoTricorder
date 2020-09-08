@@ -38,13 +38,13 @@
 #define SCAN_LED_PIN_3 PIN_A2	//16
 #define SCAN_LED_PIN_4 PIN_A3	//17
 
-#define SCAN_LED_BRIGHTNESS 128
+#define SCAN_LED_BRIGHTNESS 32
 
 // power LED. must use an unreserved pin for this.
 // cdn-learn.adafruit.com/assets/assets/000/046/243/large1024/adafruit_products_Feather_M0_Adalogger_v2.2-1.png?1504885273
 #define POWER_LED_PIN 6
 #define NEOPIXEL_BRIGHTNESS 32
-#define NEOPIXEL_LED_COUNT 1
+#define NEOPIXEL_LED_COUNT 3
 // built-in pins: D4 = blue conn LED, 8 = neopixel on board, D13 = red LED next to micro usb port
 #define NEOPIXEL_BOARD_LED_PIN	8
 
@@ -93,7 +93,14 @@ Adafruit_SHT31 oHumid;
 int mnPowerColor = 4;
 int mnBoardColor = 4;
 int mnPowerLEDInterval = 5000;
+int mnEMRGLEDInterval = 100;
+int mnEMRGMinStrength = 8;
+int mnEMRGMaxStrength = 224;
+int mnEMRGCurrentStrength = 8;
+bool mbLEDIDSet = false;
 unsigned long mnLastUpdatePower = 0;
+unsigned long mnLastUpdateEMRG = 0;
+bool mbEMRGdirection = false;
 int mnBoardLEDInterval = 5000;
 unsigned long mnLastUpdateBoard = 0;
 
@@ -130,7 +137,8 @@ int mnClimateBarStart = 62;
 unsigned long mnLastTempBar = 0;
 unsigned long mnLastBaromBar = 0;
 unsigned long mnLastHumidBar = 0;
-unsigned long mnBarDrawInterval = 17;
+//17 ms is 60fps. setting this to 120fps, at least for initial crawl
+unsigned long mnBarDrawInterval = 9;
 bool mbHumidBarComplete = false;
 bool mbTempBarComplete = false;
 bool mbBaromBarComplete = false;
@@ -214,7 +222,8 @@ void loop() {
 void NeoPixelColor(int nPin) {
 	unsigned long lTimer = millis();
 	if (nPin == POWER_LED_PIN) {
-		if ((lTimer - mnLastUpdatePower) > mnPowerLEDInterval) {
+		if (mnLastUpdatePower == 0 || ((lTimer - mnLastUpdatePower) > mnPowerLEDInterval)) {
+			//these will need to have their own intervals
 			//switch should eventually be changed to poll voltage pin - pin#, r,g,b
 			//cycle order = blue, green, yellow, orange, red
 			switch (mnPowerColor) {
@@ -224,9 +233,32 @@ void NeoPixelColor(int nPin) {
 				case 1: ledPwrStrip.setPixelColor(0, 128, 96, 0); mnPowerColor = 0; break;
 				default: ledPwrStrip.setPixelColor(0, 128, 0, 0); mnPowerColor = 4; break;
 			}
+			if (!mbLEDIDSet) {
+				ledPwrStrip.setPixelColor(1, 96, 128, 0);
+				mbLEDIDSet = true;
+				//ledPwrStrip.setPixelColor(2, 128, 0, 0);
+			}
+						
 			mnLastUpdatePower = lTimer;
 			ledPwrStrip.show();
-		}
+		} 
+		if ((lTimer - mnLastUpdateEMRG) > mnEMRGLEDInterval) {
+			int nCurrentEMRG = mnEMRGCurrentStrength;
+			int nEMRGIncrement = (mnEMRGMaxStrength - mnEMRGMinStrength) / (mnEMRGLEDInterval / 8);
+			if (nCurrentEMRG >= mnEMRGMaxStrength || nCurrentEMRG <= mnEMRGMinStrength) {
+				mbEMRGdirection = !mbEMRGdirection;
+			}
+			nCurrentEMRG = nCurrentEMRG + ((mbEMRGdirection == true ? 1 : -1) * nEMRGIncrement);
+			
+			if (nCurrentEMRG > mnEMRGMaxStrength)
+				nCurrentEMRG == mnEMRGMaxStrength;
+			if (nCurrentEMRG < mnEMRGMinStrength)
+				nCurrentEMRG == mnEMRGMinStrength;
+			mnEMRGCurrentStrength = nCurrentEMRG;
+			ledPwrStrip.setPixelColor(2, nCurrentEMRG, 0, 0);
+			ledPwrStrip.show();
+			mnLastUpdateEMRG = lTimer;
+		}		
 	} else if (nPin == NEOPIXEL_BOARD_LED_PIN) {
 		//unsure if want to use, as this needs to be sensor flash.
 		if ((lTimer - mnLastUpdateBoard) > mnBoardLEDInterval) {
