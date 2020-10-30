@@ -10,5 +10,5 @@ Button Support        OK - using easybutton library pulled from elsewhere on git
 Microphone Spectrum <br/>
 Visualization         OK - not the most accurate thing, but has a very high refresh rate.  Uses AdafruitZero_FFT library for FFT calculations.<br/>
 
-to do:
+to do: 
 sound playback via separate wav/ogg board
