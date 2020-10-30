@@ -6,8 +6,16 @@
 #include <Adafruit_APDS9960.h>	//RGB, light, proximity, gesture sensor
 #include <Wire.h>
 #include <EasyButton.h>
-#include <Adafruit_BMP280.h>	//altitude, temp, barometer
-#include <Adafruit_SHT31.h>
+#include <Adafruit_BMP280.h>	//altitude, barometer
+#include <Adafruit_SHT31.h>		//temp, humidity
+#include <Adafruit_Sensor.h>	//wtf is this??
+//#include <Adafruit_ZeroPDM.h>
+#include <PDM.h>
+#include <Adafruit_ZeroFFT.h>
+
+//these aren't migrated to nrf52 chip architecture
+//#include <arduinoFFT.h>
+//#include <ArduinoSound.h>
 
 // need to remove hyphens from header filenames or exception will get thrown
 #include "Fonts/lcars15pt7b.h"
@@ -25,38 +33,61 @@
 
 //pin 9 can pull power level (used for battery %)?
 //cannot use this pin for anything else if you care about battery %
-#define VOLT_PIN PIN_A6
+#define VOLT_PIN 			PIN_A6
+#define SLEEP_PIN			13
+#define REED_PIN			12
 
 //buttons, scroller	- d2 pin actually pin #2?
-#define BUTTON_1_PIN		PIN_A4
-#define BUTTON_2_PIN		PIN_A5
-#define BUTTON_3_PIN		2
+//we can't use pin 13 for buttons, as that is connected directly to a red LED on the board.
+//button on the board is connected to pin 7.  TX is pin 0, RX is pin 1 - these are normally used for serial communication
+//you can't use 13 as an input.
+//#define BUTTON_1_PIN		PIN_A4
+//#define BUTTON_2_PIN		PIN_A5
+//#define BUTTON_3_PIN		(0)
+
+#define BUTTON_1_PIN		(0)	//PIN_AREF
+#define BUTTON_2_PIN		PIN_A4
+#define BUTTON_3_PIN		PIN_A5
+//#define BUTTON_4_PIN		PIN_NFC2
+#define BUTTON_BOARD		7
 
 // A0 is pin14. can't use that as an output pin?		A0 = 14, A3 = 17
-#define SCAN_LED_PIN_1 PIN_A0	//14
-#define SCAN_LED_PIN_2 PIN_A1	//15
-#define SCAN_LED_PIN_3 PIN_A2	//16
-#define SCAN_LED_PIN_4 PIN_A3	//17
+#define SCAN_LED_PIN_1 	PIN_A0	//14
+#define SCAN_LED_PIN_2 	PIN_A1	//15
+#define SCAN_LED_PIN_3 	PIN_A2	//16
+#define SCAN_LED_PIN_4 	PIN_A3	//17
 
-#define SCAN_LED_BRIGHTNESS 32
+#define SCAN_LED_BRIGHTNESS 24
 
 // power LED. must use an unreserved pin for this.
 // cdn-learn.adafruit.com/assets/assets/000/046/243/large1024/adafruit_products_Feather_M0_Adalogger_v2.2-1.png?1504885273
-#define POWER_LED_PIN 6
-#define NEOPIXEL_BRIGHTNESS 32
-#define NEOPIXEL_LED_COUNT 3
+#define POWER_LED_PIN 			6
+#define NEOPIXEL_BRIGHTNESS 	32
+#define NEOPIXEL_LED_COUNT 		3
 // built-in pins: D4 = blue conn LED, 8 = neopixel on board, D13 = red LED next to micro usb port
 #define NEOPIXEL_BOARD_LED_PIN	8
 
+//#define PIN_SERIAL1_RX       (1)
+//#define PIN_SERIAL1_TX       (0)
+
+//system os version #. max 3 digits
+#define DEVICE_VERSION			"0.8"
+
 // TNG colors here
-#define color_SWOOP			0xF7B3
-#define color_MAINTEXT			0xC69F
-#define color_LABELTEXT		0x841E
+#define color_SWOOP				0xF7B3
+#define color_MAINTEXT			0x9E7F
+//#define color_MAINTEXT			0xC69F
+#define color_LABELTEXT			0x841E
 #define color_HEADER			0xFEC8
-#define color_TITLETEXT		0xFEC8
+#define color_TITLETEXT			0xFEC8
+//196,187,145
 #define color_LABELTEXT2		0xC5D2
+//204,174,220
 #define color_LABELTEXT3		0xCD7B
+#define color_LABELTEXT4		0xEE31
 #define color_LEGEND			0x6A62
+//210,202,157
+#define color_FFT				0xDEB5
 
 // ds9
 //#define color_SWOOP			0xD4F0
@@ -66,8 +97,8 @@
 //#define color_TITLETEXT		0xC3ED
 //#define color_LABELTEXT2		0xC5D2
 // voy
-//#define color_SWOOP			0x9E7F
-//#define color_MAINTEXT		0x7C34
+//#define color_MAINTEXT		0x9E7F
+//#define color_SWOOP			0x7C34
 //#define color_LABELTEXT		0x9CDF
 //#define color_HEADER			0xCB33
 //#define color_TITLETEXT		0xFFAF
@@ -80,7 +111,7 @@
 #define RGBto565(r,g,b) ((((r) & 0xF8) << 8) | (((g) & 0xFC) << 3) | ((b) >> 3))
 
 Adafruit_NeoPixel ledPwrStrip(NEOPIXEL_LED_COUNT, POWER_LED_PIN, NEO_GRB + NEO_KHZ800);
-Adafruit_NeoPixel ledBoard(NEOPIXEL_LED_COUNT, NEOPIXEL_BOARD_LED_PIN, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel ledBoard(1, NEOPIXEL_BOARD_LED_PIN, NEO_GRB + NEO_KHZ800);
 
 // do not fuck with this. 2.0 IS THE BOARD
 Adafruit_ST7789 tft = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_RST);
@@ -91,11 +122,14 @@ Adafruit_SHT31 oHumid;
 
 //power & board color enumerator: blue = 4, green = 3, yellow = 2, orange = 1, red = 0
 int mnPowerColor = 4;
+bool mbCyclePowerColor = false;
+bool mbCycleBoardColor = false;
 int mnBoardColor = 4;
-int mnPowerLEDInterval = 5000;
-int mnEMRGLEDInterval = 100;
+//power interval doesn't need to check more than every 30 seconds
+int mnPowerLEDInterval = 30000;
+int mnEMRGLEDInterval = 110;
 int mnEMRGMinStrength = 8;
-int mnEMRGMaxStrength = 224;
+int mnEMRGMaxStrength = 212;
 int mnEMRGCurrentStrength = 8;
 bool mbLEDIDSet = false;
 unsigned long mnLastUpdatePower = 0;
@@ -145,23 +179,76 @@ bool mbBaromBarComplete = false;
 int marrScaleNotches[] = {123, 185, 247};
 unsigned long mnLastClimateScan = 0;
 
+bool mbHomeActive = false;
+unsigned long mnLastUpdateHome = 0;
+int mnHomeUpdateInterval = 1000;
+bool mbMicrophoneStarted = false;
+bool mbMicrophoneActive = false;
+bool mbMicrophoneRedraw = false;
+
+extern PDMClass PDM;
+
+//mic sample rate is hertz, all samples are stored as 16 bit data.
+//number of samples must be double the desired resolution, and be a base 2 number
+//16k hertz -> 0-8k hertz max audio range captured
+#define MIC_SAMPLESIZE 		256
+//16k is the ONLY SUPPORTED SAMPLE RATE!
+//#define MIC_SAMPLERATE		16000
+#define MIC_AMPLITUDE		1000          // Depending on audio source level, you may need to alter this value. Can be used as a 'sensitivity' control.
+#define DECIMATION			64
+#define FFT_REFERENCELINES	16
+//#define FFT_MAX				150
+#define FFT_BINCOUNT        16
+#define FFT_BARHEIGHTMAX	64
+
+#define GRAPH_OFFSET 10
+#define GRAPH_WIDTH (tft.width() - 3)
+#define GRAPH_HEIGHT (tft.height() - GRAPH_OFFSET)
+#define GRAPH_MIN (tft.height() - 2)
+#define GRAPH_MAX (tft.height() - GRAPH_OFFSET)
+
+long MIC_SAMPLERATE	= 16000;
+int32_t mnMicVal = 0;
+short mnarrSampleData[MIC_SAMPLESIZE];
+// number of samples read
+volatile int mnSamplesRead = 0;
+double mdarrActual[MIC_SAMPLESIZE];
+double mdarrImaginary[MIC_SAMPLESIZE];
+
+// a windowed sinc filter for 44 khz, 64 samples
+//uint16_t marrSincFilter[DECIMATION] = {0, 2, 9, 21, 39, 63, 94, 132, 179, 236, 302, 379, 467, 565, 674, 792, 920, 1055, 1196, 1341, 1487, 1633, 1776, 1913, 2042, 2159, 2263, 2352, 2422, 2474, 2506, 2516, 2506, 2474, 2422, 2352, 2263, 2159, 2042, 1913, 1776, 1633, 1487, 1341, 1196, 1055, 920, 792, 674, 565, 467, 379, 302, 236, 179, 132, 94, 63, 39, 21, 9, 2, 0, 0};
+
+unsigned long mnLastMicRead = 0;
+//dumb to have this read more than 30fps anyway
+int mnMicReadInterval = 50;
+short mCurrentMicDisplay[FFT_BINCOUNT] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+short mTargetMicDisplay[FFT_BINCOUNT] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+
 //button functionality
 bool mbButton1Flag = false;
 bool mbButton2Flag = false;
 bool mbButton3Flag = false;
+bool mbButton5Flag = false;
 EasyButton oButton1(BUTTON_1_PIN);
 EasyButton oButton2(BUTTON_2_PIN);
 EasyButton oButton3(BUTTON_3_PIN);
+//reed switch sleep mode - may be better to wire this directly from display backlight pin to ground
+EasyButton oButton4(12);
+bool mbButton4Flag = false;
+//board button digital pin 7 - use for "pause scanner"?
+//EasyButton oButton5(BUTTON_BOARD);
+//bool mbButton5Toggled = false;
+
 
 void setup() {
 	ledPwrStrip.begin();
 	ledBoard.begin();
 	
-	// OR use this initializer (uncomment) if using a 2.0" 320x240 TFT:
+	// OR use this initializer (uncomment) if using a 2.0" 320x240 TFT. technically this is a rotated 240x320, so declaration is in that order
 	tft.init(240, 320, SPI_MODE0); // Init ST7789 320x240
 	tft.setRotation(1);
 	tft.setFont(&lcars11pt7b);
-	//these googles, they do nothing!
+	//these goggles, they do nothing!
 	tft.setTextWrap(false);
 	
 	//Serial.begin(9600);
@@ -178,6 +265,27 @@ void setup() {
 	pinMode(SCAN_LED_PIN_2, OUTPUT);
 	pinMode(SCAN_LED_PIN_3, OUTPUT);
 	pinMode(SCAN_LED_PIN_4, OUTPUT);
+	//this will be used to "turn off" the display via reed switch when the door is closed - this is just pulling backlight to ground.
+	pinMode(SLEEP_PIN, OUTPUT);
+	//this will also cause the red LED on the board to ALWAYS be on, so you know if sleep is activated while door closed.
+	//digitalWrite(SLEEP_PIN, HIGH);
+	
+	//AREF pin is an analog reference and set low by default. need to write high to this to initialize it
+	//or it'll be read as low and boot the tricorder into environment section
+	pinMode(BUTTON_1_PIN, OUTPUT);
+	digitalWrite(BUTTON_1_PIN, HIGH);
+	delay(10);
+	
+	pinMode(BUTTON_1_PIN, INPUT);
+	pinMode(BUTTON_2_PIN, INPUT);
+	pinMode(BUTTON_3_PIN, INPUT);
+	//this is required so the reed switch can be read.  
+	//by default, pin 12 is low, and we need this high so the switch can be pulled low when triggered.
+	pinMode(REED_PIN, OUTPUT);
+	digitalWrite(REED_PIN, HIGH);
+	delay(10);
+	pinMode(REED_PIN, INPUT);	
+	pinMode(VOLT_PIN, INPUT);	
 	
 	//initialize color sensor, show error if unavailable. sensor hard-coded name is "ADPS"
 	//begin will return false if initialize failed. 
@@ -198,11 +306,29 @@ void setup() {
 	mbTempInitialized = oTempBarom.begin();
 	mbHumidityInitialized = oHumid.begin();	
 	
+	//microphone
+	//PDM.setBufferSize(MIC_SAMPLESIZE * 2);
+	PDM.onReceive(PullMicData);
+	//PDM.setGain(50);
+	mbMicrophoneStarted = PDM.begin(1, MIC_SAMPLERATE);
+	PDM.end();
+	//PDM.onReceive(GetMicrophoneData);
+	
 	oButton2.begin();
 	oButton2.onPressed(ToggleRGBSensor);	
 	
 	oButton1.begin();
 	oButton1.onPressed(ToggleClimateSensor);
+	
+	oButton3.begin();
+	oButton3.onPressed(ToggleMicrophone);
+	
+	oButton4.begin();
+	oButton4.onPressedFor(500, SleepMode);
+	
+	//for (int oImag = 0; oImag < MICROPHONE_SAMPLES; oImag++) {
+	//	mdarrImaginary[oImag] = 0;
+	//}
 	
 	GoHome();
 }
@@ -211,27 +337,66 @@ void loop() {
 	//this toggles RGB scanner
 	oButton2.read();
 	oButton1.read();
+	oButton3.read();
+	oButton4.read();
 	
-	NeoPixelColor(POWER_LED_PIN);
-	LeftScanner();
+	//there's gotta be a cleaner way to do this?
+	if (oButton4.isReleased() && mbButton4Flag) {
+		ActiveMode();
+	}
+	
+	RunNeoPixelColor(POWER_LED_PIN);
+	RunNeoPixelColor(NEOPIXEL_BOARD_LED_PIN);
+	RunLeftScanner();
+	RunHome();
 	
 	RunRGBSensor();
 	RunClimateSensor();
+	RunMicrophone();	
 }
 
-void NeoPixelColor(int nPin) {
+void SleepMode() {
+	mbButton4Flag = true;
+	//to-do: turn all lights OFF, turn off screen, reset all "status" variables
+	//if (mbButton4Toggled) {
+		tft.fillScreen(ST77XX_BLACK);		
+		//need wired pin to set backlight low here
+		//void sleep(void) { tft.sendCommand(ST77XX_SLPIN); }
+		//void wake(void) { tft.sendCommand(ST77XX_SLPOUT); }
+	//} 	
+}
+
+void ActiveMode() {	
+	mbButton4Flag = false;
+	GoHome();
+}
+
+void RunNeoPixelColor(int nPin) {
 	unsigned long lTimer = millis();
 	if (nPin == POWER_LED_PIN) {
 		if (mnLastUpdatePower == 0 || ((lTimer - mnLastUpdatePower) > mnPowerLEDInterval)) {
 			//these will need to have their own intervals
 			//switch should eventually be changed to poll voltage pin - pin#, r,g,b
 			//cycle order = blue, green, yellow, orange, red
-			switch (mnPowerColor) {
-				case 4: ledPwrStrip.setPixelColor(0, 0, 0, 128); mnPowerColor = 3; break;
-				case 3: ledPwrStrip.setPixelColor(0, 0, 128, 0); mnPowerColor = 2; break;
-				case 2: ledPwrStrip.setPixelColor(0, 112, 128, 0); mnPowerColor = 1; break;
-				case 1: ledPwrStrip.setPixelColor(0, 128, 96, 0); mnPowerColor = 0; break;
-				default: ledPwrStrip.setPixelColor(0, 128, 0, 0); mnPowerColor = 4; break;
+			if (mbCyclePowerColor) {			
+				switch (mnPowerColor) {
+					case 4: ledPwrStrip.setPixelColor(0, 0, 0, 128); mnPowerColor = 3; break;
+					case 3: ledPwrStrip.setPixelColor(0, 0, 128, 0); mnPowerColor = 2; break;
+					case 2: ledPwrStrip.setPixelColor(0, 112, 128, 0); mnPowerColor = 1; break;
+					case 1: ledPwrStrip.setPixelColor(0, 128, 96, 0); mnPowerColor = 0; break;
+					default: ledPwrStrip.setPixelColor(0, 128, 0, 0); mnPowerColor = 4; break;
+				}
+			} else {
+				float fBattV = analogRead(VOLT_PIN);
+				int nBattMap = map(fBattV, 0, 600, 0, 5);
+				switch (nBattMap) {
+					case 4: ledPwrStrip.setPixelColor(0, 0, 0, 128); break;
+					case 3: ledPwrStrip.setPixelColor(0, 0, 128, 0); break;
+					case 2: ledPwrStrip.setPixelColor(0, 112, 128, 0); break;
+					case 1: ledPwrStrip.setPixelColor(0, 128, 96, 0); break;
+					default: ledPwrStrip.setPixelColor(0, 128, 0, 0); break;
+				}
+								
 			}
 			if (!mbLEDIDSet) {
 				ledPwrStrip.setPixelColor(1, 96, 128, 0);
@@ -240,7 +405,7 @@ void NeoPixelColor(int nPin) {
 			}
 						
 			mnLastUpdatePower = lTimer;
-			ledPwrStrip.show();
+			//ledPwrStrip.show();
 		} 
 		if ((lTimer - mnLastUpdateEMRG) > mnEMRGLEDInterval) {
 			int nCurrentEMRG = mnEMRGCurrentStrength;
@@ -262,14 +427,25 @@ void NeoPixelColor(int nPin) {
 	} else if (nPin == NEOPIXEL_BOARD_LED_PIN) {
 		//unsure if want to use, as this needs to be sensor flash.
 		if ((lTimer - mnLastUpdateBoard) > mnBoardLEDInterval) {
-			//switch should eventually be changed to poll voltage pin
-			//cycle order = blue, green, yellow, orange, red
-			switch (mnBoardColor) {
-				case 4: ledBoard.setPixelColor(0, 0, 0, 128); mnBoardColor = 3; break;
-				case 3: ledBoard.setPixelColor(0, 0, 128, 0); mnBoardColor = 2; break;
-				case 2: ledBoard.setPixelColor(0, 112, 128, 0); mnBoardColor = 1; break;
-				case 1: ledBoard.setPixelColor(0, 128, 96, 0); mnBoardColor = 0; break;
-				default: ledBoard.setPixelColor(0, 128, 0, 0); mnBoardColor = 4; break;
+			if (mbCycleBoardColor == false) {
+				float fBattVBoard = analogRead(VOLT_PIN);
+				int nBattMapBoard = map(fBattVBoard, 0, 600, 0, 5);
+				//cycle order = blue, green, yellow, orange, red
+				switch (nBattMapBoard) {
+					case 4: ledBoard.setPixelColor(0, 0, 0, 128); break;
+					case 3: ledBoard.setPixelColor(0, 0, 128, 0); break;
+					case 2: ledBoard.setPixelColor(0, 112, 128, 0); break;
+					case 1: ledBoard.setPixelColor(0, 128, 96, 0); break;
+					default: ledBoard.setPixelColor(0, 128, 0, 0); break;
+				}							
+			} else {
+				switch (mnBoardColor) {
+					case 4: ledBoard.setPixelColor(0, 0, 0, 128); mnBoardColor = 3; break;
+					case 3: ledBoard.setPixelColor(0, 0, 128, 0); mnBoardColor = 2; break;
+					case 2: ledBoard.setPixelColor(0, 112, 128, 0); mnBoardColor = 1; break;
+					case 1: ledBoard.setPixelColor(0, 128, 96, 0); mnBoardColor = 0; break;
+					default: ledBoard.setPixelColor(0, 128, 0, 0); mnBoardColor = 4; break;
+				}
 			}
 			mnLastUpdateBoard = lTimer;
 			ledBoard.show();
@@ -285,17 +461,18 @@ void ActivateFlash() {
 
 //to-do: add parameters to change cycle behavior of LEDs.
 //ex: cycled down-> up, stacking, unified blink, KITT ping pong, etc
-void LeftScanner() {
+void RunLeftScanner() {
 	unsigned long lTimer = millis();
 	
 	if ((lTimer - mnLastUpdateLeftLED) > mnLeftLEDInterval) {		
+		//add switch or if/else for different scanner modes
 		switch (mnLeftLEDCurrent) {
 			case 1: analogWrite(SCAN_LED_PIN_1, 0); analogWrite(SCAN_LED_PIN_4, SCAN_LED_BRIGHTNESS); mnLeftLEDCurrent = 4; break;
 			case 2: analogWrite(SCAN_LED_PIN_2, 0); analogWrite(SCAN_LED_PIN_1, SCAN_LED_BRIGHTNESS); mnLeftLEDCurrent = 1; break;
 			case 3: analogWrite(SCAN_LED_PIN_3, 0); analogWrite(SCAN_LED_PIN_2, SCAN_LED_BRIGHTNESS); mnLeftLEDCurrent = 2; break;
 			default: analogWrite(SCAN_LED_PIN_4, 0); analogWrite(SCAN_LED_PIN_3, SCAN_LED_BRIGHTNESS); mnLeftLEDCurrent = 3; break;
 		}
-		mnLastUpdateLeftLED = lTimer;
+		mnLastUpdateLeftLED = lTimer;		
 	}
 }
 
@@ -303,7 +480,7 @@ void GoHome() {
 	//reset any previous sensor statuses
 	mnRGBCooldown = 0;
 	mnClimateCooldown = 0;
-	
+	mbHomeActive = true;
 	mbRGBActive = false;
 	mbTempActive = false;
 	
@@ -329,66 +506,147 @@ void GoHome() {
 	tft.fillScreen(ST77XX_BLACK);
 	// home screen header is 2 rounded rectangles, lines to cut them, 1 black rect as backing for header text
 	//fillRoundRect(x,y,width,height,cornerRadius, color)
-	tft.fillRoundRect(3, 1, 316, 20, 9, color_SWOOP);
-	tft.fillRoundRect(3, 219, 316, 20, 9, color_SWOOP);
-	//left side slots
-	tft.drawFastVLine(15, 1, 312, ST77XX_BLACK);
-	tft.drawFastVLine(16, 1, 312, ST77XX_BLACK);
-	tft.drawFastVLine(17, 1, 312, ST77XX_BLACK);
-	tft.drawFastVLine(18, 1, 312, ST77XX_BLACK);
-	tft.drawFastVLine(19, 1, 312, ST77XX_BLACK);
-	tft.drawFastVLine(20, 1, 312, ST77XX_BLACK);
-	//bottom right slots
-	tft.drawFastVLine(305, 219, 20, ST77XX_BLACK);
-	tft.drawFastVLine(304, 219, 20, ST77XX_BLACK);
-	tft.drawFastVLine(303, 219, 20, ST77XX_BLACK);
-	tft.drawFastVLine(302, 219, 20, ST77XX_BLACK);	
-	tft.drawFastVLine(301, 219, 20, ST77XX_BLACK);
-	tft.drawFastVLine(300, 219, 20, ST77XX_BLACK);
+	//top and bottom borders
+	tft.fillRoundRect(26, 1, 289, 22, 11, color_SWOOP);
+	tft.fillRoundRect(26, 216, 289, 22, 11, color_SWOOP);
+	//left side
+	tft.fillRoundRect(1, 1, 68, 66, 32, color_SWOOP);
+	tft.fillRoundRect(1, 171, 68, 66, 32, color_SWOOP);
+	tft.fillRoundRect(59, 23, 24, 193, 11, ST77XX_BLACK);
+	//middle section
+	tft.fillRect(1, 39, 58, 164, color_HEADER);
+	//middle section black lines
+	tft.drawFastHLine(1, 35, 58, ST77XX_BLACK);
+	tft.drawFastHLine(1, 36, 58, ST77XX_BLACK);
+	tft.drawFastHLine(1, 37, 58, ST77XX_BLACK);
+	tft.drawFastHLine(1, 38, 58, ST77XX_BLACK);
+	tft.drawFastHLine(1, 39, 58, ST77XX_BLACK);	
+	tft.drawFastHLine(1, 40, 58, ST77XX_BLACK);	
+	tft.drawFastHLine(1, 201, 58, ST77XX_BLACK);
+	tft.drawFastHLine(1, 202, 58, ST77XX_BLACK);
+	tft.drawFastHLine(1, 203, 58, ST77XX_BLACK);
+	tft.drawFastHLine(1, 204, 58, ST77XX_BLACK);
+	tft.drawFastHLine(1, 205, 58, ST77XX_BLACK);
+	tft.drawFastHLine(1, 206, 58, ST77XX_BLACK);
+	//bottom right
+	tft.drawFastVLine(296, 216, 22, ST77XX_BLACK);
+	tft.drawFastVLine(297, 216, 22, ST77XX_BLACK);	
+	tft.drawFastVLine(298, 216, 22, ST77XX_BLACK);
+	tft.drawFastVLine(299, 216, 22, ST77XX_BLACK);
+	tft.drawFastVLine(300, 216, 22, ST77XX_BLACK);
+	tft.drawFastVLine(301, 216, 22, ST77XX_BLACK);	
 
 	//black section for home screen title
-	tft.fillRect(237, 1, 68, 20, ST77XX_BLACK);
-	drawParamText(234, 20, "  STATUS", color_MAINTEXT);
+	tft.fillRect(232, 1, 69, 22, ST77XX_BLACK);
+	drawParamText(229, 21, "  STATUS", color_MAINTEXT);
 
-	//set font to 11pt since header is done
-	tft.setFont(&lcars11pt7b);		
-
-	//show sensor statuses	
-	if (mbColorInitialized) {
-		drawParamText(20, 54, "CHROMATICS", color_LABELTEXT);
-		drawParamText(95, 54, "ONLINE", color_MAINTEXT);
-	} else {
-		//use red alert theme for any errors
-		drawParamText(20, 54, "CHROMATICS", color_REDLABELTEXT);
-		drawParamText(95, 54, "OFFLINE", color_REDDATATEXT);
-	}
+	//set font to 11pt since header is done	
+	tft.fillRoundRect(76, 39, 14, 11, 5, color_LABELTEXT);
+	tft.fillRoundRect(76, 63, 14, 11, 5, color_LABELTEXT);
+	tft.fillRoundRect(76, 87, 14, 11, 5, color_LABELTEXT);
 	
+	tft.fillRoundRect(162, 39, 14, 11, 5, color_MAINTEXT);
+	tft.fillRoundRect(162, 63, 14, 11, 5, color_MAINTEXT);
+	tft.fillRoundRect(162, 87, 14, 11, 5, color_MAINTEXT);
+
+	tft.fillRoundRect(252, 87, 14, 11, 5, color_MAINTEXT);
+	tft.setFont(&lcars11pt7b);
+	
+	drawParamText(101, 50, "POWER", color_LABELTEXT);
+	drawParamText(101, 75, "UPTIME", color_LABELTEXT);
+	drawParamText(101, 100, "CPU", color_LABELTEXT);
+	
+	//number only for battery level
+	ShowBatteryLevel(213, 50, color_LABELTEXT, color_MAINTEXT);
+	//uptime
+	drawParamText(185, 75, "00:00.00", color_MAINTEXT);
+	//cpu speed	
+	drawParamText(204, 100, String((float) F_CPU / 1023000.0), color_MAINTEXT);
+	//device version
+	drawParamText(235, 100, "           " + String(DEVICE_VERSION), color_MAINTEXT);
+	
+	//color_LABELTEXT2 brown, labeltext3 pinkish, labeltext4 is tan/orange
+	//show sensor statuses		
 	//environment = temperature, humidity sensors
 	if (mbTempInitialized) {
-		drawParamText(20, 84, "CLIMATE", color_LABELTEXT);
-		drawParamText(95, 84, mbHumidityInitialized ? "ONLINE" : "PARTIAL", color_MAINTEXT);
+		tft.fillRect(76, 119, 139, 24, color_LABELTEXT4);
+		//actual status tab
+		tft.fillRoundRect(279, 119, 24, 24, 11, color_LABELTEXT4);
+		tft.fillRect(230, 119, 65, 24, color_LABELTEXT4);
+		drawParamText(239, 138, mbHumidityInitialized ? "ONLINE" : "PARTIAL", ST77XX_BLACK);
 	} else if (mbHumidityInitialized) {
-		drawParamText(20, 84, "CLIMATE", color_LABELTEXT);
-		drawParamText(95, 84, "PARTIAL", color_MAINTEXT);
+		tft.fillRect(76, 119, 139, 24, color_LABELTEXT3);
+		//actual status tab
+		tft.fillRoundRect(279, 150, 24, 24, 11, color_LABELTEXT3);
+		tft.fillRect(230, 119, 65, 24, color_LABELTEXT3);
+		drawParamText(239, 138, "PARTIAL", ST77XX_BLACK);
 	} else {
-		drawParamText(20, 54, "CLIMATE", color_REDLABELTEXT);
-		drawParamText(95, 54, "OFFLINE", color_REDDATATEXT);
+		tft.fillRect(76, 119, 139, 24, color_LABELTEXT2);
+		//drawParamText(95, 84, "OFFLINE", color_REDDATATEXT);
 	}
-
-	ShowBatteryLevel(222, 54, color_LABELTEXT, color_MAINTEXT);
+	drawParamText(159, 138, "CLIMATE", ST77XX_BLACK);
 	
-	//bottom crawling text	?
-	String sWarningText = "UNITED FEDERATION OF PLANETS";
-	//drawWalkingText(75, 200, const_cast<char*>(sWarningText.c_str()), color_MAINTEXT);
-	//drawParamText(75, 200, const_cast<char*>(sWarningText.c_str()), color_MAINTEXT);
-	//erase crawling text
-	//tft.fillRect(75, 180, 180, 25, ST77XX_BLACK);
+	if (mbColorInitialized) {
+		tft.fillRect(76, 150, 139, 24, color_LABELTEXT4);		
+		tft.fillRoundRect(279, 150, 24, 24, 11, color_LABELTEXT4);
+		tft.fillRect(230, 150, 65, 24, color_LABELTEXT4);
+		
+		drawParamText(239, 169, "ONLINE", ST77XX_BLACK);
+	} else {		
+		tft.fillRect(76, 150, 139, 24, color_LABELTEXT2);
+	}
+	drawParamText(137, 169, "CHROMATICS", ST77XX_BLACK);
+	
+	if (mbMicrophoneStarted) {
+		tft.fillRect(76, 181, 139, 24, color_LABELTEXT4);		
+		tft.fillRoundRect(279, 181, 24, 24, 11, color_LABELTEXT4);
+		tft.fillRect(230, 181, 65, 24, color_LABELTEXT4);
+		drawParamText(239, 200, "ONLINE", ST77XX_BLACK);
+	} else {
+		tft.fillRect(76, 181, 139, 24, color_LABELTEXT2);
+	}
+	drawParamText(174, 200, "AUDIO", ST77XX_BLACK);
+		
+}
+
+void RunHome() {	
+	if (!mbHomeActive) return;
+	
+	//show system uptime, battery level		
+	if (millis() - mnLastUpdateHome > mnHomeUpdateInterval) {
+		//blank last uptime display, refresh values
+		int nUptimeSeconds = (millis() / 1000);
+		int nUptimeMinutes = (nUptimeSeconds / 60);
+		int nDisplayMinutes = nUptimeMinutes;
+		int nUptimeHours = nUptimeMinutes / 60;
+		int nDisplaySeconds = nUptimeSeconds;
+		
+		//only update battery level every 5 seconds
+		if ((nUptimeSeconds % 10) == 0) {
+			tft.fillRect(205, 35, 30, 24, ST77XX_BLACK);
+			ShowBatteryLevel(213, 50, color_LABELTEXT, color_MAINTEXT);
+		}
+		
+		if (nUptimeHours > 0) {
+			nDisplayMinutes = nUptimeMinutes - (nUptimeHours * 60);			
+		}
+		if (nUptimeMinutes > 0) {
+			nDisplaySeconds = nUptimeSeconds - (nUptimeMinutes * 60);
+		}
+		
+		String sUptime =  (nUptimeHours > 9 ? String(nUptimeHours) : "0" + String(nUptimeHours) ) + ":" + (nDisplayMinutes > 9 ? String(nDisplayMinutes) : "0" + String(nDisplayMinutes)) + "." + (nDisplaySeconds > 9 ? String(nDisplaySeconds) : "0" + String(nDisplaySeconds));
+		tft.fillRect(180, 58, 58, 25, ST77XX_BLACK);
+		drawParamText(185, 75, sUptime, color_MAINTEXT);
+		mnLastUpdateHome = millis();
+	}
 }
 
 void ToggleRGBSensor() {
 	mbButton2Flag = !mbButton2Flag;
 	//reset any temperature app values
 	mbTempActive = false;
+	mbHomeActive = false;
+	mbMicrophoneActive = false;
 	mnTempTargetBar = 0;
 	mnTempCurrentBar = 0;
 	mnHumidTargetBar = 0;
@@ -398,6 +656,7 @@ void ToggleRGBSensor() {
 	mbHumidBarComplete = false;
 	mbTempBarComplete = false;
 	mbBaromBarComplete = false;
+	//to-do: reset any microphone sensor values
 	
 	if (mbButton2Flag) {
 		//to-do: if sensor disabled or not started, pulse message to display
@@ -605,12 +864,10 @@ void ShowBatteryLevel(int nPosX, int nPosY, uint16_t nLabelColor, uint16_t nValu
 	//need to use space characters to pad string because it'll wrap back around to left edge when cursor set over 240 (height).
 	//this is a glitch of adafruit GFX library - it thinks display is 240x320 despite the rotation in setup() and setting for text wrap
 	//sBatteryStatus = "      " + String((int)fBattV);
-	sBatteryStatus = "      " + String(nBattPct);
-	//carrBatteryStatus = const_cast<char*>(sBatteryStatus.c_str());
-	//tft.getTextBounds("POWER", 222, 54, &nTextPosX, &nTextPosY, &nTextWidth, &nTextHeight);
-	drawParamText(nPosX + 20, nPosY, const_cast<char*>(sBatteryStatus.c_str()), color_MAINTEXT);
+	sBatteryStatus = String(nBattPct);
+	drawParamText(nPosX + GetBuffer(nBattPct), nPosY, const_cast<char*>(sBatteryStatus.c_str()), color_MAINTEXT);
 	
-	drawParamText(nPosX, nPosY, "POWER", color_LABELTEXT);
+	//drawParamText(nPosX, nPosY, "POWER", color_LABELTEXT);
 }
 
 void ToggleClimateSensor() {
@@ -619,13 +876,15 @@ void ToggleClimateSensor() {
 	mnRGBCooldown = 0;
 	mnClimateCooldown = 0;	
 	mbRGBActive = false;
+	//to-do: reset any microphone sensor values
+	mbMicrophoneActive = false;
+	mbHomeActive = false;
 	
 	if (mbButton1Flag) {
 		if (!mbTempActive) {
 			mbTempActive = true;
 			//load temp scanner screen - this is done once to improve perf
 			tft.fillScreen(ST77XX_BLACK);
-			//tft.fillScreen(ST77XX_GREEN);
 			tft.fillRoundRect(0, -25, 85, 113, 25, color_SWOOP);
 			tft.fillRoundRect(0, 93, 85, 172, 25, color_SWOOP);
 			tft.drawFastHLine(24, 84, 296, color_SWOOP);
@@ -816,6 +1075,210 @@ void RunClimateSensor() {
 	}	
 }
 
+void ToggleMicrophone() {
+	mbButton3Flag = !mbButton3Flag;
+	//reset any rgb sensor values
+	mnRGBCooldown = 0;
+	mnClimateCooldown = 0;	
+	mbMicrophoneActive = false;
+	//reset any temperature app values
+	mbHomeActive = false;
+	mbTempActive = false;
+	mnTempTargetBar = 0;
+	mnTempCurrentBar = 0;
+	mnHumidTargetBar = 0;
+	mnHumidCurrentBar = 0;
+	mnBaromTargetBar = 0;
+	mnBaromCurrentBar = 0;
+	mbHumidBarComplete = false;
+	mbTempBarComplete = false;
+	mbBaromBarComplete = false;
+	
+	if (mbButton3Flag) {
+		//show audio screen
+		//tft.fillScreen(0x6B6D);
+		tft.fillScreen(ST77XX_BLACK);
+		//fillRoundRect(x,y,width,height,cornerRadius, color)
+		tft.fillRoundRect(0, -25, 85, 91, 25, color_SWOOP);
+		tft.fillRoundRect(0, 71, 85, 194, 25, color_SWOOP);
+		tft.drawFastHLine(24, 63, 296, color_SWOOP);
+		tft.drawFastHLine(24, 64, 296, color_SWOOP);
+		tft.drawFastHLine(24, 65, 296, color_SWOOP);
+		tft.drawFastHLine(24, 66, 296, color_SWOOP);		
+		
+		tft.drawFastHLine(24, 71, 296, color_SWOOP);
+		tft.drawFastHLine(24, 72, 296, color_SWOOP);
+		tft.drawFastHLine(24, 73, 296, color_SWOOP);
+		tft.drawFastHLine(24, 74, 296, color_SWOOP);
+		
+		tft.fillRoundRect(50, -8, 40, 71, 10, ST77XX_BLACK);
+		tft.fillRoundRect(50, 75, 40, 173, 10, ST77XX_BLACK);
+		tft.setFont(&lcars15pt7b);
+		drawParamText(184, 20, "AUDIO ANALYSIS", color_TITLETEXT);
+		tft.setFont(&lcars11pt7b);
+		drawParamText(78, 48, "0", color_MAINTEXT);
+		drawParamText(112, 48, "DECIBEL", color_LABELTEXT3);
+		drawParamText(203, 48, "0", color_MAINTEXT);
+		drawParamText(237, 48, "MAXIMUM", color_LABELTEXT);
+		
+		//PDM.setBufferSize(2);		
+		PDM.setGain(150);
+		PDM.onReceive(PullMicData);		
+		//first param for begin function is # channels. this is always 1 for mono		
+		mbMicrophoneStarted = PDM.begin(1, MIC_SAMPLERATE);
+		
+		//flip this last
+		mbMicrophoneActive = true;
+		
+		//tft.drawFastVLine(61, 97, 128, ST77XX_WHITE);
+	} else {
+		PDM.end();
+		//need to zero out both arrays used by draw functions
+		
+		GoHome();
+	}
+}
+
+void RunMicrophone() {
+	if (!mbMicrophoneActive) return;
+	//kick out if min interval not reached
+	//if (millis() - mnLastMicRead < mnMicReadInterval || mnSamplesRead == 0) return;	
+	short nMicReadMax = 0;
+	
+	//separate if statements for action. 1 for data massage, 1 for display draw actions
+	//if (millis() - mnLastMicRead >= mnMicReadInterval && mnSamplesRead > 0) {
+	//realtime polling seems like a lot more resources, but it actually appears to increase stability
+	if (mnSamplesRead > 0) {		
+		//if (!mbMicrophoneStarted) {
+		//	//generate message that microphone is unavailable.
+		//	drawParamText(20, 20, "microphone connection failure", ST77XX_WHITE);
+		//	mnLastMicRead = millis();
+		//	return;
+		//}
+		
+		//use pdmwave value for decibel approximation?
+		
+		//fuck attempting to run this against a hard-coded filter, just do FFT on raw data?
+		int nFFTStatus = ZeroFFT(mnarrSampleData, MIC_SAMPLESIZE);
+		//zero the fuckin targets out between each read operation!
+				
+		//convert FFT data into distinct bin values
+        if (nFFTStatus == 0) {
+            int nSampleDivider = 8;
+            //throw all samples into 
+            for (int j = 1; j < (MIC_SAMPLESIZE / 2); j++) {
+                //condense 128 samples down to boxes of 16
+                int nArrayIndex = j / nSampleDivider;
+				if (j % nSampleDivider == 1)
+				mTargetMicDisplay[nArrayIndex] = 0;
+				
+                //mTargetMicDisplay[nArrayIndex] += mnarrSampleData[j];
+				mTargetMicDisplay[nArrayIndex] += abs(mnarrSampleData[j]);
+            }
+			
+			/*
+			//normalize the incoming data?			
+			for (int m = 1; m < FFT_BINCOUNT; m++) {
+				nMicReadMax = max(mTargetMicDisplay[m], nMicReadMax);
+				//if (m == 0)	nMicReadMax /= 2;
+			}*/
+			
+            //convert combined bin values to usable averages.
+            for (int k = 0; k < FFT_BINCOUNT; k++) {
+				//int nFactor = map(k, 0, FFT_BINCOUNT - 1, 1, 8);
+                //average the bin first?
+                //mTargetMicDisplay[k] /= nSampleDivider;
+				int nTemp = (k == 0) ? map(mTargetMicDisplay[k], 0, 50, 0, FFT_BARHEIGHTMAX) : map(mTargetMicDisplay[k] * (1 + k/2), 0, 50, 0, FFT_BARHEIGHTMAX);
+				//int nTemp = map(mTargetMicDisplay[k] * nFactor, 0, 100, 0, FFT_BARHEIGHTMAX);
+                //map bin average value to a usable target band height
+                mTargetMicDisplay[k] = constrain(nTemp, 0, FFT_BARHEIGHTMAX);				
+            }
+        }
+		//nAvg = nAvg / MIC_SAMPLESIZE;
+		//set boolean flag that display needs refresh
+		mnLastMicRead = millis();
+		//this is a trigger to force subsequent loops to not blank graph if no mic data present
+		mnSamplesRead = 0;
+		//set global redraw flag for visualization
+		mbMicrophoneRedraw = true;
+	}
+	
+	if (mbMicrophoneRedraw == true) {
+		UpdateMicrophoneGraph(nMicReadMax, color_FFT);
+	}
+	
+	//all draw actions here - if display needs refresh
+	//if (false) {	
+		//draw all points
+	//	int16_t lasty = 220;
+	//	int16_t thisy = 220;
+		//graph area should be 240x128, top left @ 67,95 - left middle @ 67, 131
+	//	for(int i = 1; i < GRAPH_WIDTH; i++){
+			//this needs refactor
+	//		uint16_t ix = map(i, 0, GRAPH_WIDTH, 0, MIC_SAMPLESIZE / 2);
+
+			//thisy = constrain(map(mnarrSampleData[ix], 0, FFT_MAX, GRAPH_MIN, GRAPH_MAX), 0, GRAPH_MAX);
+	//		thisy = 220 - constrain(map(mnarrSampleData[ix], 0, 1000, 0, 218), 0, 218);
+			
+	//		tft.drawLine(i - 1, lasty, i, thisy, ST77XX_GREEN);
+	//		lasty = thisy;
+	//	}		
+	//}	
+	
+	
+}	//end runmic
+
+void drawReference() {
+  //draw some reference lines?
+  uint16_t refStep = MIC_SAMPLESIZE / 2 / FFT_REFERENCELINES;
+  //tft.setTextSize(2);
+  //tft.setTextColor(ST77XX_RED);
+  for(int i=0; i < MIC_SAMPLESIZE / 2 - refStep; i+=refStep){
+    uint16_t fc = FFT_BIN(i, MIC_SAMPLERATE, MIC_SAMPLESIZE);
+    uint16_t xpos = map(i, 0, MIC_SAMPLESIZE / 2, 0, GRAPH_WIDTH);
+    //tft.setCursor(xpos, 0);
+    tft.drawFastVLine(xpos + i, GRAPH_MIN, GRAPH_MAX - GRAPH_MIN, ST77XX_WHITE);
+    
+    //tft.print(fc);
+	//drawParamText(20, i + 20, String(fc), ST77XX_WHITE);
+  }
+}
+
+void PullMicData() {	
+	//apparently this causes issues, as this function can't access a global variable?
+	//if (mbMicrophoneActive == true) {	
+	//no idea how to do this.  read() ONLY WORKS FOR SAMPLE RATE OF 16000!
+	int nAvailable = PDM.available();
+	//drawParamText(200, 100, String(nAvailable), ST77XX_WHITE);
+	//mnSamplesRead = PDM.read(mnarrSampleData, MIC_SAMPLESIZE);
+	PDM.read(mnarrSampleData, nAvailable);
+	mnSamplesRead = nAvailable / 2;
+}
+
+int32_t GetPDMWave(int32_t nSamples) {
+	short nMinwave = 30000;
+	short nMaxwave = -30000;
+	//performance on this function is hot garbage.
+
+	while (nSamples > 0) {
+		if (!mnSamplesRead || mnSamplesRead == 0) {
+			//return 0;			
+			yield();			
+			//break;
+			continue;
+		}
+		
+		for (int i = 0; i < mnSamplesRead; i++) {
+			nMinwave = min(mnarrSampleData[i], nMinwave);
+			nMaxwave = max(mnarrSampleData[i], nMaxwave);
+			nSamples--;
+		}
+		// clear the read count
+		mnSamplesRead = 0;
+	}
+	return nMaxwave - nMinwave;
+}
+
 void RGBtoHSL(double r, double g, double b, double hsl[]) { 
 	//this assumes byte - need to divide by 255 to get byte?
     double rd = r/255;
@@ -849,17 +1312,11 @@ void RGBtoHSL(double r, double g, double b, double hsl[]) {
     hsl[2] = l * 100;
 }
 
-int ThreewayIntMax(uint16_t a, uint16_t b, uint16_t c) {
-    return max(a, max(b, c));
-}
+int ThreewayIntMax(uint16_t a, uint16_t b, uint16_t c) {	return max(a, max(b, c));	}
 
-double ThreewayMax(double a, double b, double c) {
-    return max(a, max(b, c));
-}
+double ThreewayMax(double a, double b, double c) {	return max(a, max(b, c));	}
 
-double ThreewayMin(double a, double b, double c) {
-    return min(a, min(b, c));
-}
+double ThreewayMin(double a, double b, double c) {	return min(a, min(b, c));	}
 
 int GetBuffer(double dInput) {
 	if (dInput < 10) {
@@ -870,9 +1327,17 @@ int GetBuffer(double dInput) {
 	return 0;
 }
 
-int Get1KBuffer(int nInput) {
-	return (nInput < 1000) ? 8 : 0;
+int GetBuffer(int nInput) {
+	if (nInput < 10) {
+		return 14;
+	} else if (nInput < 100) {
+		return 8;
+	} else {
+		return 0;
+	}
 }
+
+int Get1KBuffer(int nInput) { return (nInput < 1000) ? 8 : 0; }
 
 String TruncateDouble(double dInput) {
 	//badlypads to 3 digits. instead have a function to return pad pixel amount, use that in text print call - more precise this way.
@@ -1120,4 +1585,52 @@ void UpdateClimateBarGraph(int nBarIndex, uint16_t nBarColor) {
 			break;
 		default: break;
 	}
+}
+
+void UpdateMicrophoneGraph(short nMaxDataValue, uint16_t nBarColor) {
+    short nGraphMinX = 66;
+    short nGraphMinY = 97;
+    short nGraphZeroY = 163;
+    short nBarWidth = 13;
+    short nBarWidthMargined = 15;
+    float fBarUpdateStepFactor = 1;
+    short nTempYDifference = 0;
+	//if nMaxDataValue not specified, values won't be normalized before draw action
+    //graph bars should expand up & down from center line @ nGraphZeroY
+	//this function's responsibility is to draw each FFT bin bar so the current display values match the target values
+	for (int i = 0; i < FFT_BINCOUNT; i++) {
+		if (nMaxDataValue > 0) {
+			mTargetMicDisplay[i] /= nMaxDataValue;
+			//then take this 0-1 value and multiply by graph bar height max to get target height
+			mTargetMicDisplay[i] *= FFT_BARHEIGHTMAX;
+			mTargetMicDisplay[i] = constrain(mTargetMicDisplay[i], 0, 64);
+		}
+		
+        //do nothing if we're already at the target
+        if (mTargetMicDisplay[i] == mCurrentMicDisplay[i]) {
+            continue;
+        } else if (mTargetMicDisplay[i] > mCurrentMicDisplay[i]) {
+            //splitting this into 2 draw calls should minimize the number of pixels getting updated, which is expensive
+            //eventually want to modify this to support a step, instead of a full update, so bars seem to animate?
+            //tft.fillRect(nPosX, nPosY, width, height, nFColor);
+            nTempYDifference = (mTargetMicDisplay[i] - mCurrentMicDisplay[i]) /*/ fBarUpdateStepFactor*/;
+            //top half
+            tft.fillRect(nGraphMinX + (i * nBarWidthMargined), (nGraphZeroY - nTempYDifference), nBarWidth, nTempYDifference * 2, nBarColor);
+            //bottom half
+            //tft.fillRect(nGraphMinX + (i * nBarWidthMargined), (nGraphZeroY + mCurrentMicDisplay[i]) + nTempYDifference, nBarWidth, nTempYDifference, nBarColor);
+            //update current bar height
+            mCurrentMicDisplay[i] = mTargetMicDisplay[i];
+        } else {
+            nTempYDifference = (mCurrentMicDisplay[i] - mTargetMicDisplay[i]) /*/ fBarUpdateStepFactor*/;
+            //top half
+            tft.fillRect(nGraphMinX + (i * nBarWidthMargined), (nGraphZeroY - mCurrentMicDisplay[i]), nBarWidth, nTempYDifference, ST77XX_BLACK);
+            //bottom half
+            tft.fillRect(nGraphMinX + (i * nBarWidthMargined), (nGraphZeroY + mTargetMicDisplay[i]), nBarWidth, nTempYDifference + 1, ST77XX_BLACK);
+            //update current bar height
+            mCurrentMicDisplay[i] = mTargetMicDisplay[i];
+        }
+    }
+
+	//reset refresh flag to false?
+	mbMicrophoneRedraw = false;
 }
