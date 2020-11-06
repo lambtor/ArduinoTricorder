@@ -49,6 +49,7 @@
 #define BUTTON_2_PIN		PIN_A4
 #define BUTTON_3_PIN		PIN_A5
 //#define BUTTON_4_PIN		PIN_NFC2
+#define BUTTON_SLEEP_PIN	12
 #define BUTTON_BOARD		7
 
 // A0 is pin14. can't use that as an output pin?		A0 = 14, A3 = 17
@@ -113,7 +114,7 @@
 Adafruit_NeoPixel ledPwrStrip(NEOPIXEL_LED_COUNT, POWER_LED_PIN, NEO_GRB + NEO_KHZ800);
 Adafruit_NeoPixel ledBoard(1, NEOPIXEL_BOARD_LED_PIN, NEO_GRB + NEO_KHZ800);
 
-// do not fuck with this. 2.0 IS THE BOARD
+// do not fuck with this. 2.0 IS THE BOARD - this call uses hardware SPI
 Adafruit_ST7789 tft = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_RST);
 //create sensor objects
 Adafruit_APDS9960 oColorSensor;
@@ -233,7 +234,7 @@ EasyButton oButton1(BUTTON_1_PIN);
 EasyButton oButton2(BUTTON_2_PIN);
 EasyButton oButton3(BUTTON_3_PIN);
 //reed switch sleep mode - may be better to wire this directly from display backlight pin to ground
-EasyButton oButton4(12);
+EasyButton oButton4(REED_PIN);
 bool mbButton4Flag = false;
 //board button digital pin 7 - use for "pause scanner"?
 //EasyButton oButton5(BUTTON_BOARD);
@@ -360,6 +361,7 @@ void SleepMode() {
 	//to-do: turn all lights OFF, turn off screen, reset all "status" variables
 	//if (mbButton4Toggled) {
 		tft.fillScreen(ST77XX_BLACK);		
+		tft.enableSleep(true);
 		//need wired pin to set backlight low here
 		//void sleep(void) { tft.sendCommand(ST77XX_SLPIN); }
 		//void wake(void) { tft.sendCommand(ST77XX_SLPOUT); }
@@ -368,6 +370,7 @@ void SleepMode() {
 
 void ActiveMode() {	
 	mbButton4Flag = false;
+	tft.enableSleep(false);
 	GoHome();
 }
 
@@ -1148,14 +1151,7 @@ void RunMicrophone() {
 	//separate if statements for action. 1 for data massage, 1 for display draw actions
 	//if (millis() - mnLastMicRead >= mnMicReadInterval && mnSamplesRead > 0) {
 	//realtime polling seems like a lot more resources, but it actually appears to increase stability
-	if (mnSamplesRead > 0) {		
-		//if (!mbMicrophoneStarted) {
-		//	//generate message that microphone is unavailable.
-		//	drawParamText(20, 20, "microphone connection failure", ST77XX_WHITE);
-		//	mnLastMicRead = millis();
-		//	return;
-		//}
-		
+	if (mnSamplesRead > 0) {	
 		//use pdmwave value for decibel approximation?
 		
 		//fuck attempting to run this against a hard-coded filter, just do FFT on raw data?
@@ -1194,37 +1190,25 @@ void RunMicrophone() {
                 mTargetMicDisplay[k] = constrain(nTemp, 0, FFT_BARHEIGHTMAX);				
             }
         }
-		//nAvg = nAvg / MIC_SAMPLESIZE;
 		//set boolean flag that display needs refresh
 		mnLastMicRead = millis();
 		//this is a trigger to force subsequent loops to not blank graph if no mic data present
 		mnSamplesRead = 0;
 		//set global redraw flag for visualization
 		mbMicrophoneRedraw = true;
+	} else {
+		if (!mbMicrophoneStarted) {
+			//generate message that microphone is unavailable.
+			drawParamText(120, 120, "MICROPHONE CONNECTION FAILURE", color_MAINTEXT);
+			mnLastMicRead = millis();
+			return;
+		}
 	}
 	
 	if (mbMicrophoneRedraw == true) {
 		UpdateMicrophoneGraph(nMicReadMax, color_FFT);
 	}
-	
-	//all draw actions here - if display needs refresh
-	//if (false) {	
-		//draw all points
-	//	int16_t lasty = 220;
-	//	int16_t thisy = 220;
-		//graph area should be 240x128, top left @ 67,95 - left middle @ 67, 131
-	//	for(int i = 1; i < GRAPH_WIDTH; i++){
-			//this needs refactor
-	//		uint16_t ix = map(i, 0, GRAPH_WIDTH, 0, MIC_SAMPLESIZE / 2);
-
-			//thisy = constrain(map(mnarrSampleData[ix], 0, FFT_MAX, GRAPH_MIN, GRAPH_MAX), 0, GRAPH_MAX);
-	//		thisy = 220 - constrain(map(mnarrSampleData[ix], 0, 1000, 0, 218), 0, 218);
-			
-	//		tft.drawLine(i - 1, lasty, i, thisy, ST77XX_GREEN);
-	//		lasty = thisy;
-	//	}		
-	//}	
-	
+		
 	
 }	//end runmic
 
@@ -1609,19 +1593,15 @@ void UpdateMicrophoneGraph(short nMaxDataValue, uint16_t nBarColor) {
         //do nothing if we're already at the target
         if (mTargetMicDisplay[i] == mCurrentMicDisplay[i]) {
             continue;
-        } else if (mTargetMicDisplay[i] > mCurrentMicDisplay[i]) {
-            //splitting this into 2 draw calls should minimize the number of pixels getting updated, which is expensive
-            //eventually want to modify this to support a step, instead of a full update, so bars seem to animate?
-            //tft.fillRect(nPosX, nPosY, width, height, nFColor);
-            nTempYDifference = (mTargetMicDisplay[i] - mCurrentMicDisplay[i]) /*/ fBarUpdateStepFactor*/;
-            //top half
+        } else if (mTargetMicDisplay[i] > mCurrentMicDisplay[i]) {            
+            nTempYDifference = (mTargetMicDisplay[i] - mCurrentMicDisplay[i]);
+            //top half & bottom half - instead of drawing twice, draw 1 rectangle that's twice as tall from same starting point
             tft.fillRect(nGraphMinX + (i * nBarWidthMargined), (nGraphZeroY - nTempYDifference), nBarWidth, nTempYDifference * 2, nBarColor);
-            //bottom half
-            //tft.fillRect(nGraphMinX + (i * nBarWidthMargined), (nGraphZeroY + mCurrentMicDisplay[i]) + nTempYDifference, nBarWidth, nTempYDifference, nBarColor);
             //update current bar height
             mCurrentMicDisplay[i] = mTargetMicDisplay[i];
         } else {
-            nTempYDifference = (mCurrentMicDisplay[i] - mTargetMicDisplay[i]) /*/ fBarUpdateStepFactor*/;
+            nTempYDifference = (mCurrentMicDisplay[i] - mTargetMicDisplay[i]);
+			//this requires 2 calls, as we need to trim from top down and bottom up for both halves of the bar
             //top half
             tft.fillRect(nGraphMinX + (i * nBarWidthMargined), (nGraphZeroY - mCurrentMicDisplay[i]), nBarWidth, nTempYDifference, ST77XX_BLACK);
             //bottom half
