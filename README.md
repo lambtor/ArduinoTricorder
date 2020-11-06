@@ -11,4 +11,5 @@ Microphone Spectrum <br/>
 Visualization:         OK - not the most accurate thing, but has a very high refresh rate.  Uses AdafruitZero_FFT library for FFT calculations.<br/>
 
 to do: 
-sound playback via separate wav/ogg board
+sound playback via separate wav/ogg board<br/>
+calculate decibels by mapping result from getPDMWave function to range of known reference values
