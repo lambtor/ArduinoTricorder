@@ -12,6 +12,7 @@
 //#include <Adafruit_ZeroPDM.h>
 #include <PDM.h>
 #include <Adafruit_ZeroFFT.h>
+//#include "tricorderSound.C"
 
 //these aren't migrated to nrf52 chip architecture
 //#include <arduinoFFT.h>
@@ -40,12 +41,13 @@
 //buttons, scroller	- d2 pin actually pin #2?
 //we can't use pin 13 for buttons, as that is connected directly to a red LED on the board.
 //button on the board is connected to pin 7.  TX is pin 0, RX is pin 1 - these are normally used for serial communication
-//you can't use 13 as an input.
+//you can't use 13 as an input, but it can be an output for maybe a single LED?
 //#define BUTTON_1_PIN		PIN_A4
 //#define BUTTON_2_PIN		PIN_A5
 //#define BUTTON_3_PIN		(0)
 
-#define BUTTON_1_PIN		(0)	//PIN_AREF
+//#define BUTTON_1_PIN		(0)	//PIN_AREF
+#define BUTTON_1_PIN		PIN_AREF
 #define BUTTON_2_PIN		PIN_A4
 #define BUTTON_3_PIN		PIN_A5
 //#define BUTTON_4_PIN		PIN_NFC2
@@ -58,7 +60,7 @@
 #define SCAN_LED_PIN_3 	PIN_A2	//16
 #define SCAN_LED_PIN_4 	PIN_A3	//17
 
-#define SCAN_LED_BRIGHTNESS 24
+#define SCAN_LED_BRIGHTNESS 	32
 
 // power LED. must use an unreserved pin for this.
 // cdn-learn.adafruit.com/assets/assets/000/046/243/large1024/adafruit_products_Feather_M0_Adalogger_v2.2-1.png?1504885273
@@ -67,12 +69,13 @@
 #define NEOPIXEL_LED_COUNT 		3
 // built-in pins: D4 = blue conn LED, 8 = neopixel on board, D13 = red LED next to micro usb port
 #define NEOPIXEL_BOARD_LED_PIN	8
-
+#define BOARD_REDLED_PIN 		13
+#define BOARD_BLUELED_PIN 		4
 //#define PIN_SERIAL1_RX       (1)
 //#define PIN_SERIAL1_TX       (0)
 
 //system os version #. max 3 digits
-#define DEVICE_VERSION			"0.8"
+#define DEVICE_VERSION			"0.82"
 
 // TNG colors here
 #define color_SWOOP				0xF7B3
@@ -140,9 +143,16 @@ int mnBoardLEDInterval = 5000;
 unsigned long mnLastUpdateBoard = 0;
 
 //left scanner leds
-int mnLeftLEDInterval = 175;
+int mnLeftLEDInterval = 200;
 int mnLeftLEDCurrent = 0;
 unsigned long mnLastUpdateLeftLED = 0;
+
+int mnBoardRedLEDInterval = 350;
+int mnBoardBlueLEDInterval = 250;
+unsigned long mnLastUpdateBoardRedLED = 0;
+unsigned long mnLastUpdateBoardBlueLED = 0;
+bool mbBoardRedLED = false;
+bool mbBoardBlueLED = false;
 
 //color sensor
 bool mbColorInitialized = false;
@@ -215,13 +225,15 @@ short mnarrSampleData[MIC_SAMPLESIZE];
 volatile int mnSamplesRead = 0;
 double mdarrActual[MIC_SAMPLESIZE];
 double mdarrImaginary[MIC_SAMPLESIZE];
+int mnMaxDBValue = 0;
+//unsigned long mnLastDBRead
 
 // a windowed sinc filter for 44 khz, 64 samples
 //uint16_t marrSincFilter[DECIMATION] = {0, 2, 9, 21, 39, 63, 94, 132, 179, 236, 302, 379, 467, 565, 674, 792, 920, 1055, 1196, 1341, 1487, 1633, 1776, 1913, 2042, 2159, 2263, 2352, 2422, 2474, 2506, 2516, 2506, 2474, 2422, 2352, 2263, 2159, 2042, 1913, 1776, 1633, 1487, 1341, 1196, 1055, 920, 792, 674, 565, 467, 379, 302, 236, 179, 132, 94, 63, 39, 21, 9, 2, 0, 0};
 
 unsigned long mnLastMicRead = 0;
 //dumb to have this read more than 30fps anyway
-int mnMicReadInterval = 50;
+int mnMicReadInterval = 5000;
 short mCurrentMicDisplay[FFT_BINCOUNT] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 short mTargetMicDisplay[FFT_BINCOUNT] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 
@@ -266,6 +278,11 @@ void setup() {
 	pinMode(SCAN_LED_PIN_2, OUTPUT);
 	pinMode(SCAN_LED_PIN_3, OUTPUT);
 	pinMode(SCAN_LED_PIN_4, OUTPUT);
+	
+	//set output for board non-neopixel LEDs
+	pinMode(BOARD_REDLED_PIN, OUTPUT);
+	pinMode(BOARD_BLUELED_PIN, OUTPUT);
+	
 	//this will be used to "turn off" the display via reed switch when the door is closed - this is just pulling backlight to ground.
 	pinMode(SLEEP_PIN, OUTPUT);
 	//this will also cause the red LED on the board to ALWAYS be on, so you know if sleep is activated while door closed.
@@ -350,6 +367,8 @@ void loop() {
 	RunNeoPixelColor(NEOPIXEL_BOARD_LED_PIN);
 	RunLeftScanner();
 	RunHome();
+	//blink board LEDs
+	RunBoardLEDs();
 	
 	RunRGBSensor();
 	RunClimateSensor();
@@ -429,31 +448,59 @@ void RunNeoPixelColor(int nPin) {
 		}		
 	} else if (nPin == NEOPIXEL_BOARD_LED_PIN) {
 		//unsure if want to use, as this needs to be sensor flash.
-		if ((lTimer - mnLastUpdateBoard) > mnBoardLEDInterval) {
-			if (mbCycleBoardColor == false) {
-				float fBattVBoard = analogRead(VOLT_PIN);
-				int nBattMapBoard = map(fBattVBoard, 0, 600, 0, 5);
-				//cycle order = blue, green, yellow, orange, red
-				switch (nBattMapBoard) {
-					case 4: ledBoard.setPixelColor(0, 0, 0, 128); break;
-					case 3: ledBoard.setPixelColor(0, 0, 128, 0); break;
-					case 2: ledBoard.setPixelColor(0, 112, 128, 0); break;
-					case 1: ledBoard.setPixelColor(0, 128, 96, 0); break;
-					default: ledBoard.setPixelColor(0, 128, 0, 0); break;
-				}							
-			} else {
-				switch (mnBoardColor) {
-					case 4: ledBoard.setPixelColor(0, 0, 0, 128); mnBoardColor = 3; break;
-					case 3: ledBoard.setPixelColor(0, 0, 128, 0); mnBoardColor = 2; break;
-					case 2: ledBoard.setPixelColor(0, 112, 128, 0); mnBoardColor = 1; break;
-					case 1: ledBoard.setPixelColor(0, 128, 96, 0); mnBoardColor = 0; break;
-					default: ledBoard.setPixelColor(0, 128, 0, 0); mnBoardColor = 4; break;
+		if (!mbRGBActive) {
+			if ((lTimer - mnLastUpdateBoard) > mnBoardLEDInterval) {
+				if (mbCycleBoardColor == false) {
+					float fBattVBoard = analogRead(VOLT_PIN);
+					int nBattMapBoard = map(fBattVBoard, 0, 600, 0, 5);
+					//cycle order = blue, green, yellow, orange, red
+					switch (nBattMapBoard) {
+						case 4: ledBoard.setPixelColor(0, 0, 0, 128); break;
+						case 3: ledBoard.setPixelColor(0, 0, 128, 0); break;
+						case 2: ledBoard.setPixelColor(0, 112, 128, 0); break;
+						case 1: ledBoard.setPixelColor(0, 128, 96, 0); break;
+						default: ledBoard.setPixelColor(0, 128, 0, 0); break;
+					}							
+				} else {
+					switch (mnBoardColor) {
+						case 4: ledBoard.setPixelColor(0, 0, 0, 128); mnBoardColor = 3; break;
+						case 3: ledBoard.setPixelColor(0, 0, 128, 0); mnBoardColor = 2; break;
+						case 2: ledBoard.setPixelColor(0, 112, 128, 0); mnBoardColor = 1; break;
+						case 1: ledBoard.setPixelColor(0, 128, 96, 0); mnBoardColor = 0; break;
+						default: ledBoard.setPixelColor(0, 128, 0, 0); mnBoardColor = 4; break;
+					}
 				}
+				mnLastUpdateBoard = lTimer;
+				ledBoard.show();
 			}
-			mnLastUpdateBoard = lTimer;
-			ledBoard.show();
+		} else {
+			//color scanner app running - do nothing
 		}
 	}
+}
+
+void RunBoardLEDs() {
+	unsigned long lTimer = millis();
+	
+	if ((lTimer - mnLastUpdateBoardRedLED) > mnBoardRedLEDInterval) {
+		//flip LED state flag, set state based on new flag
+		mbBoardRedLED = !mbBoardRedLED;
+		if (mbBoardRedLED) {
+			digitalWrite(BOARD_REDLED_PIN, HIGH);
+		} else {
+			digitalWrite(BOARD_REDLED_PIN, LOW);
+		}
+		mnLastUpdateBoardRedLED = lTimer;
+	}
+	if ((lTimer - mnLastUpdateBoardBlueLED) > mnBoardBlueLEDInterval) {
+		mbBoardBlueLED = !mbBoardBlueLED;
+		if (mbBoardRedLED) {
+			digitalWrite(BOARD_BLUELED_PIN, HIGH);
+		} else {
+			digitalWrite(BOARD_BLUELED_PIN, LOW);
+		}
+		mnLastUpdateBoardBlueLED = lTimer;
+	}	
 }
 
 void ActivateFlash() {
@@ -466,6 +513,8 @@ void ActivateFlash() {
 //ex: cycled down-> up, stacking, unified blink, KITT ping pong, etc
 void RunLeftScanner() {
 	unsigned long lTimer = millis();
+	
+	//to-do: when color scanner running, use left side lights to convey scan coming soon:
 	
 	if ((lTimer - mnLastUpdateLeftLED) > mnLeftLEDInterval) {		
 		//add switch or if/else for different scanner modes
@@ -719,7 +768,6 @@ void ToggleRGBSensor() {
 		} 
 		//Serial.println("button 2 yes flag");
 		//tft.fillRoundRect(140, 110, 100, 50, 10, ST77XX_YELLOW);
-		//
 	} else {
 		GoHome();		
 		//Serial.println("button 2 no flag");
@@ -845,6 +893,11 @@ void RunRGBSensor() {
 			if (mnRGBCooldown > 0) {
 				drawParamText(37, 71, const_cast<char*>(((String)mnRGBCooldown).c_str()), ST77XX_BLACK);
 			}
+		}
+		//if board led lit, turn it off
+		if (ledBoard.getPixelColor(0) > 0) {
+			ledBoard.clear();
+			ledBoard.show();
 		}
 	}	
 }	//end runRGBSensor
@@ -1120,9 +1173,9 @@ void ToggleMicrophone() {
 		drawParamText(184, 20, "AUDIO ANALYSIS", color_TITLETEXT);
 		tft.setFont(&lcars11pt7b);
 		drawParamText(78, 48, "0", color_MAINTEXT);
-		drawParamText(112, 48, "DECIBEL", color_LABELTEXT3);
-		drawParamText(203, 48, "0", color_MAINTEXT);
-		drawParamText(237, 48, "MAXIMUM", color_LABELTEXT);
+		//drawParamText(112, 48, "DECIBEL", color_LABELTEXT3);
+		//drawParamText(203, 48, "0", color_MAINTEXT);
+		//drawParamText(237, 48, "MAXIMUM", color_LABELTEXT);
 		
 		//PDM.setBufferSize(2);		
 		PDM.setGain(150);
@@ -1143,16 +1196,31 @@ void ToggleMicrophone() {
 }
 
 void RunMicrophone() {
-	if (!mbMicrophoneActive) return;
-	//kick out if min interval not reached
-	//if (millis() - mnLastMicRead < mnMicReadInterval || mnSamplesRead == 0) return;	
+	if (!mbMicrophoneActive) return;	
 	short nMicReadMax = 0;
 	
-	//separate if statements for action. 1 for data massage, 1 for display draw actions
-	//if (millis() - mnLastMicRead >= mnMicReadInterval && mnSamplesRead > 0) {
+	//separate if statements for action. 1 for data massage, 1 for display draw actions	
 	//realtime polling seems like a lot more resources, but it actually appears to increase stability
 	if (mnSamplesRead > 0) {	
 		//use pdmwave value for decibel approximation?
+		//poll this only once every few seconds - 5?
+		if (millis() - mnLastMicRead > mnMicReadInterval) {
+			int dbValue = 0;
+			//dbValue = 20 * log10(abs(GetPDMWave(4000)) / 30000);
+			dbValue = GetPDMWave(4000);
+			tft.fillRect(68, 32, 30, 18, ST77XX_BLACK);
+			drawParamText(68, 48, String(dbValue), color_MAINTEXT);
+			
+			tft.fillRect(198, 32, 30, 18, ST77XX_BLACK);
+			dbValue = 20 * log10(GetPDMWave(4000) / 1500);
+			drawParamText(198, 48, String(dbValue), color_MAINTEXT);
+			/*
+			if (dbValue > mnMaxDBValue) {
+				drawParamText(198, 48, String(dbValue), color_MAINTEXT);
+				mnMaxDBValue = dbValue;
+			}*/
+			mnLastMicRead = millis();
+		}
 		
 		//fuck attempting to run this against a hard-coded filter, just do FFT on raw data?
 		int nFFTStatus = ZeroFFT(mnarrSampleData, MIC_SAMPLESIZE);
@@ -1191,7 +1259,7 @@ void RunMicrophone() {
             }
         }
 		//set boolean flag that display needs refresh
-		mnLastMicRead = millis();
+		//mnLastMicRead = millis();
 		//this is a trigger to force subsequent loops to not blank graph if no mic data present
 		mnSamplesRead = 0;
 		//set global redraw flag for visualization
@@ -1200,15 +1268,16 @@ void RunMicrophone() {
 		if (!mbMicrophoneStarted) {
 			//generate message that microphone is unavailable.
 			drawParamText(120, 120, "MICROPHONE CONNECTION FAILURE", color_MAINTEXT);
-			mnLastMicRead = millis();
+			//mnLastMicRead = millis();
+			mbMicrophoneRedraw = false;
 			return;
 		}
 	}
 	
 	if (mbMicrophoneRedraw == true) {
 		UpdateMicrophoneGraph(nMicReadMax, color_FFT);
-	}
-		
+		mbMicrophoneRedraw = false;
+	}		
 	
 }	//end runmic
 
