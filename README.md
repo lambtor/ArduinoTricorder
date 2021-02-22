@@ -16,4 +16,4 @@ Draw operations on the display from the arduino aren't that fast.  The FFT draw 
 
 to do: 
 sound playback via separate wav/ogg board<br/>
-calculate decibels by mapping result from getPDMWave function to range of known reference values
+
