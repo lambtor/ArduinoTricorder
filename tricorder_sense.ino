@@ -17,6 +17,10 @@
 //these aren't migrated to nrf52 chip architecture
 //#include <arduinoFFT.h>
 //#include <ArduinoSound.h>
+//#include <AmplitudeAnalyzer.h>
+
+//to-do: have device broadcast for bluetooth connectivity, allow selection of ID led color and preferred "THEME"
+//between ds9, voyager, tng
 
 // need to remove hyphens from header filenames or exception will get thrown
 #include "Fonts/lcars15pt7b.h"
@@ -65,7 +69,7 @@
 // power LED. must use an unreserved pin for this.
 // cdn-learn.adafruit.com/assets/assets/000/046/243/large1024/adafruit_products_Feather_M0_Adalogger_v2.2-1.png?1504885273
 #define POWER_LED_PIN 			6
-#define NEOPIXEL_BRIGHTNESS 	32
+#define NEOPIXEL_BRIGHTNESS 	64
 #define NEOPIXEL_LED_COUNT 		3
 // built-in pins: D4 = blue conn LED, 8 = neopixel on board, D13 = red LED next to micro usb port
 #define NEOPIXEL_BOARD_LED_PIN	8
@@ -75,7 +79,7 @@
 //#define PIN_SERIAL1_TX       (0)
 
 //system os version #. max 3 digits
-#define DEVICE_VERSION			"0.82"
+#define DEVICE_VERSION			"0.84"
 
 // TNG colors here
 #define color_SWOOP				0xF7B3
@@ -232,8 +236,8 @@ int mnMaxDBValue = 0;
 //uint16_t marrSincFilter[DECIMATION] = {0, 2, 9, 21, 39, 63, 94, 132, 179, 236, 302, 379, 467, 565, 674, 792, 920, 1055, 1196, 1341, 1487, 1633, 1776, 1913, 2042, 2159, 2263, 2352, 2422, 2474, 2506, 2516, 2506, 2474, 2422, 2352, 2263, 2159, 2042, 1913, 1776, 1633, 1487, 1341, 1196, 1055, 920, 792, 674, 565, 467, 379, 302, 236, 179, 132, 94, 63, 39, 21, 9, 2, 0, 0};
 
 unsigned long mnLastMicRead = 0;
-//dumb to have this read more than 30fps anyway
-int mnMicReadInterval = 5000;
+//decibel estimation every 3 seconds
+int mnMicReadInterval = 3000;
 short mCurrentMicDisplay[FFT_BINCOUNT] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 short mTargetMicDisplay[FFT_BINCOUNT] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 
@@ -421,7 +425,7 @@ void RunNeoPixelColor(int nPin) {
 								
 			}
 			if (!mbLEDIDSet) {
-				ledPwrStrip.setPixelColor(1, 96, 128, 0);
+				ledPwrStrip.setPixelColor(1, 90, 140, 0);
 				mbLEDIDSet = true;
 				//ledPwrStrip.setPixelColor(2, 128, 0, 0);
 			}
@@ -591,8 +595,7 @@ void GoHome() {
 	//black section for home screen title
 	tft.fillRect(232, 1, 69, 22, ST77XX_BLACK);
 	drawParamText(229, 21, "  STATUS", color_MAINTEXT);
-
-	//set font to 11pt since header is done	
+	
 	tft.fillRoundRect(76, 39, 14, 11, 5, color_LABELTEXT);
 	tft.fillRoundRect(76, 63, 14, 11, 5, color_LABELTEXT);
 	tft.fillRoundRect(76, 87, 14, 11, 5, color_LABELTEXT);
@@ -602,6 +605,7 @@ void GoHome() {
 	tft.fillRoundRect(162, 87, 14, 11, 5, color_MAINTEXT);
 
 	tft.fillRoundRect(252, 87, 14, 11, 5, color_MAINTEXT);
+	//set font to 11pt since header is done	
 	tft.setFont(&lcars11pt7b);
 	
 	drawParamText(101, 50, "POWER", color_LABELTEXT);
@@ -747,7 +751,7 @@ void ToggleRGBSensor() {
 			
 			tft.fillRect(123, 114, 30, 8, ST77XX_BLACK);
 			tft.setFont(&lcars15pt7b);
-			drawParamText(154, 21, "CHROMATIC ANALYSIS", color_TITLETEXT);
+			drawParamText(151, 21, "CHROMATIC ANALYSIS", color_TITLETEXT);
 			//data labels
 			tft.setFont(&lcars11pt7b);
 			drawParamText(112, 48, "RED", color_LABELTEXT);
@@ -1170,12 +1174,16 @@ void ToggleMicrophone() {
 		tft.fillRoundRect(50, -8, 40, 71, 10, ST77XX_BLACK);
 		tft.fillRoundRect(50, 75, 40, 173, 10, ST77XX_BLACK);
 		tft.setFont(&lcars15pt7b);
-		drawParamText(184, 20, "AUDIO ANALYSIS", color_TITLETEXT);
+		drawParamText(188, 20, "AUDIO ANALYSIS", color_TITLETEXT);
 		tft.setFont(&lcars11pt7b);
-		drawParamText(78, 48, "0", color_MAINTEXT);
-		//drawParamText(112, 48, "DECIBEL", color_LABELTEXT3);
-		//drawParamText(203, 48, "0", color_MAINTEXT);
-		//drawParamText(237, 48, "MAXIMUM", color_LABELTEXT);
+		drawParamText(73, 48, "0", color_MAINTEXT);
+		drawParamText(107, 48, "DECIBEL", color_LABELTEXT3);
+		tft.fillRoundRect(153, 32, 17, 18, 9, color_LABELTEXT4);
+		tft.fillRect(153, 32, 6, 17, ST77XX_BLACK);
+		drawParamText(194 + GetBuffer(0), 48, "0", color_MAINTEXT);
+		drawParamText(227, 48, "MAXIMUM", color_LABELTEXT);
+		tft.fillRoundRect(286, 32, 17, 18, 9, color_LABELTEXT4);
+		tft.fillRect(286, 32, 6, 17, ST77XX_BLACK);		
 		
 		//PDM.setBufferSize(2);		
 		PDM.setGain(150);
@@ -1185,7 +1193,7 @@ void ToggleMicrophone() {
 		
 		//flip this last
 		mbMicrophoneActive = true;
-		
+		//tft.drawFastVLine(60, 99, 128, ST77XX_WHITE);
 		//tft.drawFastVLine(61, 97, 128, ST77XX_WHITE);
 	} else {
 		PDM.end();
@@ -1206,19 +1214,21 @@ void RunMicrophone() {
 		//poll this only once every few seconds - 5?
 		if (millis() - mnLastMicRead > mnMicReadInterval) {
 			int dbValue = 0;
-			//dbValue = 20 * log10(abs(GetPDMWave(4000)) / 30000);
-			dbValue = GetPDMWave(4000);
-			tft.fillRect(68, 32, 30, 18, ST77XX_BLACK);
-			drawParamText(68, 48, String(dbValue), color_MAINTEXT);
+			//dbValue = 20 * log10(abs(GetPDMWave(4000)) / 8000);
+			//mapping can be 20* but 21.8 might be more accurate?
+			dbValue = 21.8 * log10(GetPDMWave(4000));
+			tft.fillRect(63, 32, 35, 18, ST77XX_BLACK);
+			drawParamText(74 + GetBuffer(dbValue), 48, String(dbValue), color_MAINTEXT);
+			//log values are in negative 2m or more
+			//tft.fillRect(198, 32, 30, 18, ST77XX_BLACK);
+			//dbValue = 20 * log10(GetPDMWave(4000) / 1500);
+			//drawParamText(198, 48, String(dbValue), color_MAINTEXT);
 			
-			tft.fillRect(198, 32, 30, 18, ST77XX_BLACK);
-			dbValue = 20 * log10(GetPDMWave(4000) / 1500);
-			drawParamText(198, 48, String(dbValue), color_MAINTEXT);
-			/*
 			if (dbValue > mnMaxDBValue) {
-				drawParamText(198, 48, String(dbValue), color_MAINTEXT);
+				tft.fillRect(194, 32, 20, 18, ST77XX_BLACK);
+				drawParamText(194 + GetBuffer(dbValue), 48, String(dbValue), color_MAINTEXT);
 				mnMaxDBValue = dbValue;
-			}*/
+			}
 			mnLastMicRead = millis();
 		}
 		
@@ -1283,18 +1293,20 @@ void RunMicrophone() {
 
 void drawReference() {
   //draw some reference lines?
-  uint16_t refStep = MIC_SAMPLESIZE / 2 / FFT_REFERENCELINES;
+  //163-64 = 99
+  tft.drawFastVLine(63, 99, 128, ST77XX_WHITE);
+  
+  //uint16_t refStep = MIC_SAMPLESIZE / 2 / FFT_REFERENCELINES;
   //tft.setTextSize(2);
   //tft.setTextColor(ST77XX_RED);
-  for(int i=0; i < MIC_SAMPLESIZE / 2 - refStep; i+=refStep){
-    uint16_t fc = FFT_BIN(i, MIC_SAMPLERATE, MIC_SAMPLESIZE);
-    uint16_t xpos = map(i, 0, MIC_SAMPLESIZE / 2, 0, GRAPH_WIDTH);
+  //for(int i=0; i < MIC_SAMPLESIZE / 2 - refStep; i+=refStep){
+    //uint16_t fc = FFT_BIN(i, MIC_SAMPLERATE, MIC_SAMPLESIZE);
+    //uint16_t xpos = map(i, 0, MIC_SAMPLESIZE / 2, 0, GRAPH_WIDTH);
     //tft.setCursor(xpos, 0);
-    tft.drawFastVLine(xpos + i, GRAPH_MIN, GRAPH_MAX - GRAPH_MIN, ST77XX_WHITE);
-    
+    //tft.drawFastVLine(xpos + i, GRAPH_MIN, GRAPH_MAX - GRAPH_MIN, ST77XX_WHITE);    
     //tft.print(fc);
 	//drawParamText(20, i + 20, String(fc), ST77XX_WHITE);
-  }
+  //}
 }
 
 void PullMicData() {	
