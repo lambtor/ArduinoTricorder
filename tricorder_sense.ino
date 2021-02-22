@@ -224,6 +224,7 @@ extern PDMClass PDM;
 
 long MIC_SAMPLERATE	= 16000;
 int32_t mnMicVal = 0;
+bool mbMicMaxRefresh = false;
 short mnarrSampleData[MIC_SAMPLESIZE];
 // number of samples read
 volatile int mnSamplesRead = 0;
@@ -974,6 +975,7 @@ void ToggleClimateSensor() {
 			tft.drawFastHLine(0, 59, 50, ST77XX_BLACK);
 			//tft.fillRect(241, 110, 2, 16, ST77XX_BLACK);
 			
+			//small black box for "scroller" 
 			tft.fillRect(123, 86, 30, 8, ST77XX_BLACK);
 			tft.setFont(&lcars15pt7b);
 			drawParamText(174, 20, "CLIMATE ANALYSIS", color_TITLETEXT);			
@@ -1161,29 +1163,88 @@ void ToggleMicrophone() {
 		//fillRoundRect(x,y,width,height,cornerRadius, color)
 		tft.fillRoundRect(0, -25, 85, 91, 25, color_SWOOP);
 		tft.fillRoundRect(0, 71, 85, 194, 25, color_SWOOP);
-		tft.drawFastHLine(24, 63, 296, color_SWOOP);
-		tft.drawFastHLine(24, 64, 296, color_SWOOP);
-		tft.drawFastHLine(24, 65, 296, color_SWOOP);
-		tft.drawFastHLine(24, 66, 296, color_SWOOP);		
 		
-		tft.drawFastHLine(24, 71, 296, color_SWOOP);
-		tft.drawFastHLine(24, 72, 296, color_SWOOP);
-		tft.drawFastHLine(24, 73, 296, color_SWOOP);
-		tft.drawFastHLine(24, 74, 296, color_SWOOP);
+		//tft.drawFastHLine(123, 61, 30, color_SWOOP);
+		//break these into 3 each to avoid a redundant black vline call
+		//tft.drawFastHLine(24, 63, 296, color_SWOOP);
+		//97,99,98
+		tft.drawFastHLine(24, 63, 96, color_SWOOP);
+		tft.drawFastHLine(123, 63, 97, color_SWOOP);
+		tft.drawFastHLine(223, 63, 97, color_SWOOP);
+		
+		//tft.drawFastHLine(24, 64, 296, color_SWOOP);
+		tft.drawFastHLine(24, 64, 96, color_SWOOP);
+		tft.drawFastHLine(123, 64, 97, color_SWOOP);
+		tft.drawFastHLine(223, 64, 97, color_SWOOP);
+		
+		//tft.drawFastHLine(24, 65, 296, color_SWOOP);
+		tft.drawFastHLine(24, 65, 96, color_SWOOP);
+		tft.drawFastHLine(123, 65, 97, color_SWOOP);
+		tft.drawFastHLine(223, 65, 97, color_SWOOP);
+		
+		//break this into 2 lines to avoid having to draw over it with a black fillRect call
+		//tft.drawFastHLine(24, 66, 296, color_SWOOP);
+		tft.drawFastHLine(24, 66, 96, color_SWOOP);
+		tft.drawFastHLine(153, 66, 67, color_SWOOP);
+		tft.drawFastHLine(223, 66, 97, color_SWOOP);
+		
+		//break this into 2 lines to avoid having to draw over it with a black fillRect call
+		//tft.drawFastHLine(24, 71, 296, color_SWOOP);
+		//tft.drawFastHLine(24, 71, 99, color_SWOOP);
+		//tft.drawFastHLine(153, 71, 167, color_SWOOP);
+		tft.drawFastHLine(24, 71, 96, color_SWOOP);
+		tft.drawFastHLine(153, 71, 67, color_SWOOP);
+		tft.drawFastHLine(223, 71, 97, color_SWOOP);
+		
+		//break these into 3 each to avoid a redundant black vline call
+		//tft.drawFastHLine(24, 72, 296, color_SWOOP);
+		tft.drawFastHLine(24, 72, 96, color_SWOOP);
+		tft.drawFastHLine(123, 72, 97, color_SWOOP);
+		tft.drawFastHLine(223, 72, 97, color_SWOOP);
+		
+		//tft.drawFastHLine(24, 73, 296, color_SWOOP);
+		tft.drawFastHLine(24, 73, 96, color_SWOOP);
+		tft.drawFastHLine(123, 73, 97, color_SWOOP);
+		tft.drawFastHLine(223, 73, 97, color_SWOOP);
+		
+		//tft.drawFastHLine(24, 74, 296, color_SWOOP);
+		tft.drawFastHLine(24, 74, 96, color_SWOOP);
+		tft.drawFastHLine(123, 74, 97, color_SWOOP);
+		tft.drawFastHLine(223, 74, 97, color_SWOOP);
 		
 		tft.fillRoundRect(50, -8, 40, 71, 10, ST77XX_BLACK);
 		tft.fillRoundRect(50, 75, 40, 173, 10, ST77XX_BLACK);
+		
+		//final black lines to section off graph area
+		tft.drawFastHLine(0, 141, 50, ST77XX_BLACK);
+		tft.drawFastHLine(0, 142, 50, ST77XX_BLACK);
+		tft.drawFastHLine(0, 143, 50, ST77XX_BLACK);
+		//tft.drawFastHLine(0, 163, 50, ST77XX_BLACK);
+		//tft.drawFastHLine(0, 164, 50, ST77XX_BLACK);		
+		tft.drawFastHLine(0, 176, 50, ST77XX_BLACK);
+		tft.drawFastHLine(0, 177, 50, ST77XX_BLACK);
+		tft.drawFastHLine(0, 178, 50, ST77XX_BLACK);
+		
+		//color in block section of swoop left of FFT
+		tft.fillRect(0, 144, 50, 32, color_HEADER);
+		
 		tft.setFont(&lcars15pt7b);
-		drawParamText(188, 20, "AUDIO ANALYSIS", color_TITLETEXT);
+		drawParamText(190, 20, "AUDIO ANALYSIS", color_TITLETEXT);
 		tft.setFont(&lcars11pt7b);
-		drawParamText(73, 48, "0", color_MAINTEXT);
-		drawParamText(107, 48, "DECIBEL", color_LABELTEXT3);
-		tft.fillRoundRect(153, 32, 17, 18, 9, color_LABELTEXT4);
-		tft.fillRect(153, 32, 6, 17, ST77XX_BLACK);
-		drawParamText(194 + GetBuffer(0), 48, "0", color_MAINTEXT);
-		drawParamText(227, 48, "MAXIMUM", color_LABELTEXT);
-		tft.fillRoundRect(286, 32, 17, 18, 9, color_LABELTEXT4);
-		tft.fillRect(286, 32, 6, 17, ST77XX_BLACK);		
+		drawParamText(86 + GetBuffer(0), 48, "0", color_MAINTEXT);
+		drawParamText(116, 48, "DECIBEL", color_LABELTEXT);
+		//tft.fillRoundRect(153, 32, 17, 18, 9, color_SWOOP);
+		//tft.fillRect(153, 32, 6, 17, ST77XX_BLACK);
+		drawParamText(201 + GetBuffer(0), 48, "0", color_MAINTEXT);
+		drawParamText(230, 48, "MAXIMUM", color_LABELTEXT3);
+		//tft.fillRoundRect(286, 32, 17, 18, 9, color_SWOOP);
+		//tft.fillRect(286, 32, 6, 17, ST77XX_BLACK);		
+		drawParamText(38, 167, "0", ST77XX_BLACK);
+		
+		tft.fillRoundRect(75, 33, 16, 16, 8, color_LABELTEXT);
+		tft.fillRect(85, 33, 8, 16, ST77XX_BLACK);
+		tft.fillRoundRect(185, 33, 16, 16, 8, color_LABELTEXT3);
+		tft.fillRect(195, 33, 8, 16, ST77XX_BLACK);
 		
 		//PDM.setBufferSize(2);		
 		PDM.setGain(150);
@@ -1198,7 +1259,7 @@ void ToggleMicrophone() {
 	} else {
 		PDM.end();
 		//need to zero out both arrays used by draw functions
-		
+		mbMicMaxRefresh = true;
 		GoHome();
 	}
 }
@@ -1217,17 +1278,22 @@ void RunMicrophone() {
 			//dbValue = 20 * log10(abs(GetPDMWave(4000)) / 8000);
 			//mapping can be 20* but 21.8 might be more accurate?
 			dbValue = 21.8 * log10(GetPDMWave(4000));
-			tft.fillRect(63, 32, 35, 18, ST77XX_BLACK);
-			drawParamText(74 + GetBuffer(dbValue), 48, String(dbValue), color_MAINTEXT);
+			tft.fillRect(86, 32, 22, 18, ST77XX_BLACK);
+			drawParamText(86 + GetBuffer(dbValue), 48, String(dbValue), color_MAINTEXT);
 			//log values are in negative 2m or more
 			//tft.fillRect(198, 32, 30, 18, ST77XX_BLACK);
 			//dbValue = 20 * log10(GetPDMWave(4000) / 1500);
 			//drawParamText(198, 48, String(dbValue), color_MAINTEXT);
 			
-			if (dbValue > mnMaxDBValue) {
-				tft.fillRect(194, 32, 20, 18, ST77XX_BLACK);
-				drawParamText(194 + GetBuffer(dbValue), 48, String(dbValue), color_MAINTEXT);
-				mnMaxDBValue = dbValue;
+			if ((dbValue > mnMaxDBValue) || mbMicMaxRefresh) {
+				tft.fillRect(201, 32, 22, 18, ST77XX_BLACK);
+				if (!mbMicMaxRefresh) {
+					mnMaxDBValue = dbValue;
+					//mnMaxDBValue = 120;
+				}
+				drawParamText(201 + GetBuffer(mnMaxDBValue), 48, String(mnMaxDBValue), color_MAINTEXT);
+				
+				mbMicMaxRefresh = false;
 			}
 			mnLastMicRead = millis();
 		}
