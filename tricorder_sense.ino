@@ -1241,8 +1241,8 @@ void ToggleMicrophone() {
 		//tft.fillRect(286, 32, 6, 17, ST77XX_BLACK);		
 		drawParamText(38, 167, "0", ST77XX_BLACK);
 		
-		tft.fillRoundRect(75, 33, 16, 16, 8, color_LABELTEXT);
-		tft.fillRect(85, 33, 8, 16, ST77XX_BLACK);
+		tft.fillRoundRect(73, 33, 16, 16, 8, color_LABELTEXT);
+		tft.fillRect(83, 33, 8, 16, ST77XX_BLACK);
 		tft.fillRoundRect(185, 33, 16, 16, 8, color_LABELTEXT3);
 		tft.fillRect(195, 33, 8, 16, ST77XX_BLACK);
 		
@@ -1256,6 +1256,16 @@ void ToggleMicrophone() {
 		mbMicrophoneActive = true;
 		//tft.drawFastVLine(60, 99, 128, ST77XX_WHITE);
 		//tft.drawFastVLine(61, 97, 128, ST77XX_WHITE);
+		//some token graph borders??
+		tft.drawFastVLine(60, 97, 128, color_LEGEND);
+		tft.drawFastVLine(61, 97, 128, color_LEGEND);
+		tft.drawFastHLine(60, 96, 4, color_LEGEND);
+		tft.drawFastHLine(60, 225, 4, color_LEGEND);
+		tft.drawFastVLine(311, 97, 128, color_LEGEND);
+		tft.drawFastVLine(312, 97, 128, color_LEGEND);
+		tft.drawFastHLine(308, 96, 4, color_LEGEND);
+		tft.drawFastHLine(308, 225, 4, color_LEGEND);
+		
 	} else {
 		PDM.end();
 		//need to zero out both arrays used by draw functions
@@ -1356,24 +1366,6 @@ void RunMicrophone() {
 	}		
 	
 }	//end runmic
-
-void drawReference() {
-  //draw some reference lines?
-  //163-64 = 99
-  tft.drawFastVLine(63, 99, 128, ST77XX_WHITE);
-  
-  //uint16_t refStep = MIC_SAMPLESIZE / 2 / FFT_REFERENCELINES;
-  //tft.setTextSize(2);
-  //tft.setTextColor(ST77XX_RED);
-  //for(int i=0; i < MIC_SAMPLESIZE / 2 - refStep; i+=refStep){
-    //uint16_t fc = FFT_BIN(i, MIC_SAMPLERATE, MIC_SAMPLESIZE);
-    //uint16_t xpos = map(i, 0, MIC_SAMPLESIZE / 2, 0, GRAPH_WIDTH);
-    //tft.setCursor(xpos, 0);
-    //tft.drawFastVLine(xpos + i, GRAPH_MIN, GRAPH_MAX - GRAPH_MIN, ST77XX_WHITE);    
-    //tft.print(fc);
-	//drawParamText(20, i + 20, String(fc), ST77XX_WHITE);
-  //}
-}
 
 void PullMicData() {	
 	//apparently this causes issues, as this function can't access a global variable?
