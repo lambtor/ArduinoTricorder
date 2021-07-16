@@ -9,18 +9,11 @@
 #include <Adafruit_BMP280.h>	//altitude, barometer
 #include <Adafruit_SHT31.h>		//temp, humidity
 #include <Adafruit_Sensor.h>	//wtf is this??
-//#include <Adafruit_ZeroPDM.h>
 #include <PDM.h>
 #include <Adafruit_ZeroFFT.h>
-//#include "tricorderSound.C"
+#include <SPIMemory.h>
+#include <Adafruit_MLX90640.h>
 
-//these aren't migrated to nrf52 chip architecture
-//#include <arduinoFFT.h>
-//#include <ArduinoSound.h>
-//#include <AmplitudeAnalyzer.h>
-
-//to-do: have device broadcast for bluetooth connectivity, allow selection of ID led color and preferred "THEME"
-//between ds9, voyager, tng
 
 // need to remove hyphens from header filenames or exception will get thrown
 #include "Fonts/lcars15pt7b.h"
@@ -29,20 +22,21 @@
 // For the breakout board, you can use any 2 or 3 pins.
 // These pins will also work for the 1.8" TFT shield.
 //need to use pin 10 for TFT_CS, as pin 9 is analog 7. analog 7 is the only way to get current voltage, which is used for battery %
-#define TFT_CS 10
+//MISO is not required for screen to work - this is used by mem card only?
+#define TFT_CS 		10
 // SD card select pin
-//#define SD_CS 11 - can't use pin 4 as that is for blue connection led
-#define TFT_RST -1
-#define TFT_DC 5
+#define SD_CS 		11 //- can't use pin 4 as that is for blue connection led
+#define TFT_RST 	-1
+#define TFT_DC 		5
 #define USE_SD_CARD 1
 
-//pin 9 can pull power level (used for battery %)?
-//cannot use this pin for anything else if you care about battery %
-#define VOLT_PIN 			PIN_A6
+//pin 9 is free, as pin_a6 is for vbat and is otherwise known as digital 20
+#define VOLT_PIN 			PIN_A6		//INPUT_POWER_PIN
 #define SLEEP_PIN			13
 #define REED_PIN			12
+#define SOUND_TRIGGER_PIN	9
 
-//buttons, scroller	- d2 pin actually pin #2?
+//buttons, scroller	- d2 pin actually pin #2
 //we can't use pin 13 for buttons, as that is connected directly to a red LED on the board.
 //button on the board is connected to pin 7.  TX is pin 0, RX is pin 1 - these are normally used for serial communication
 //you can't use 13 as an input, but it can be an output for maybe a single LED?
@@ -79,7 +73,7 @@
 //#define PIN_SERIAL1_TX       (0)
 
 //system os version #. max 3 digits
-#define DEVICE_VERSION			"0.84"
+#define DEVICE_VERSION			"0.85"
 
 // TNG colors here
 #define color_SWOOP				0xF7B3
@@ -253,10 +247,51 @@ EasyButton oButton3(BUTTON_3_PIN);
 //reed switch sleep mode - may be better to wire this directly from display backlight pin to ground
 EasyButton oButton4(REED_PIN);
 bool mbButton4Flag = false;
-//board button digital pin 7 - use for "pause scanner"?
-//EasyButton oButton5(BUTTON_BOARD);
+
+//board button digital pin 7 - use for "pause scanner" or thermal camera toggle
+EasyButton oButton5(BUTTON_BOARD);
 //bool mbButton5Toggled = false;
 
+
+Adafruit_MLX90640 oThermalCamera;
+//temperature cutoffs are given in celsius. -12C => -10F
+#define MIN_CAMERA_TEMP -12;
+#define	MAX_CAMERA_TEMP	100; 
+float mfarrTempFrame[32*24];
+bool mbThermalCameraStarted = false;
+int mnLastCameraFrame = 0;
+//this must be less than 10 for all data to be displayed on 320x240. this scales display window to 256 x 192, a border of 48px all around
+uint16_t mnThermalPixelWidth = 8;
+uint16_t mnThermalPixelHeight = 8;
+uint8_t mnCameraDisplayStartX = 48;
+uint8_t mnCameraDisplayStartY = 48;
+//16hz ~= 16fps
+//while this is editable, it's probably not worth the time to decode and re-encode just to convert it to the desired LCARS color scheme
+const uint16_t mnarrThermalDisplayColors[] = {0x480F, 0x400F,0x400F,0x400F,0x4010,0x3810,0x3810,0x3810,0x3810,0x3010,0x3010,
+0x3010,0x2810,0x2810,0x2810,0x2810,0x2010,0x2010,0x2010,0x1810,0x1810,0x1811,0x1811,0x1011,0x1011,0x1011,0x0811,0x0811,0x0811,0x0011,0x0011,
+0x0011,0x0011,0x0011,0x0031,0x0031,0x0051,0x0072,0x0072,0x0092,0x00B2,0x00B2,0x00D2,0x00F2,0x00F2,0x0112,0x0132,0x0152,0x0152,0x0172,0x0192,
+0x0192,0x01B2,0x01D2,0x01F3,0x01F3,0x0213,0x0233,0x0253,0x0253,0x0273,0x0293,0x02B3,0x02D3,0x02D3,0x02F3,0x0313,0x0333,0x0333,0x0353,0x0373,
+0x0394,0x03B4,0x03D4,0x03D4,0x03F4,0x0414,0x0434,0x0454,0x0474,0x0474,0x0494,0x04B4,0x04D4,0x04F4,0x0514,0x0534,0x0534,0x0554,0x0554,0x0574,
+0x0574,0x0573,0x0573,0x0573,0x0572,0x0572,0x0572,0x0571,0x0591,0x0591,0x0590,0x0590,0x058F,0x058F,0x058F,0x058E,0x05AE,0x05AE,0x05AD,0x05AD,
+0x05AD,0x05AC,0x05AC,0x05AB,0x05CB,0x05CB,0x05CA,0x05CA,0x05CA,0x05C9,0x05C9,0x05C8,0x05E8,0x05E8,0x05E7,0x05E7,0x05E6,0x05E6,0x05E6,0x05E5,
+0x05E5,0x0604,0x0604,0x0604,0x0603,0x0603,0x0602,0x0602,0x0601,0x0621,0x0621,0x0620,0x0620,0x0620,0x0620,0x0E20,0x0E20,0x0E40,0x1640,0x1640,
+0x1E40,0x1E40,0x2640,0x2640,0x2E40,0x2E60,0x3660,0x3660,0x3E60,0x3E60,0x3E60,0x4660,0x4660,0x4E60,0x4E80,0x5680,0x5680,0x5E80,0x5E80,0x6680,
+0x6680,0x6E80,0x6EA0,0x76A0,0x76A0,0x7EA0,0x7EA0,0x86A0,0x86A0,0x8EA0,0x8EC0,0x96C0,0x96C0,0x9EC0,0x9EC0,0xA6C0,0xAEC0,0xAEC0,0xB6E0,0xB6E0,
+0xBEE0,0xBEE0,0xC6E0,0xC6E0,0xCEE0,0xCEE0,0xD6E0,0xD700,0xDF00,0xDEE0,0xDEC0,0xDEA0,0xDE80,0xDE80,0xE660,0xE640,0xE620,0xE600,0xE5E0,0xE5C0,
+0xE5A0,0xE580,0xE560,0xE540,0xE520,0xE500,0xE4E0,0xE4C0,0xE4A0,0xE480,0xE460,0xEC40,0xEC20,0xEC00,0xEBE0,0xEBC0,0xEBA0,0xEB80,0xEB60,0xEB40,
+0xEB20,0xEB00,0xEAE0,0xEAC0,0xEAA0,0xEA80,0xEA60,0xEA40,0xF220,0xF200,0xF1E0,0xF1C0,0xF1A0,0xF180,0xF160,0xF140,0xF100,0xF0E0,0xF0C0,0xF0A0,
+0xF080,0xF060,0xF040,0xF020,0xF800,};
+
+//to-do:
+//left side led stacking mode for countdown to color scanner action
+//top button toggle for thermal imaging camera, thermal camera screen
+//rearrange pin functions to leverage analog input for potentiometer
+//map ID led color to potentiometer. 
+//	top edge of rotation -> all WHITE
+//	rest of colors cycle through color spectrum blue > green > yellow > orange > red > pink > purple
+//refactor home screen to report status of thermal camera connection
+//to-do: have device broadcast for bluetooth connectivity, allow selection of ID led color and preferred "THEME"
+//between ds9, voyager, tng
 
 void setup() {
 	ledPwrStrip.begin();
@@ -309,6 +344,7 @@ void setup() {
 	delay(10);
 	pinMode(REED_PIN, INPUT);	
 	pinMode(VOLT_PIN, INPUT);	
+	pinMode(BUTTON_BOARD, INPUT);
 	
 	//initialize color sensor, show error if unavailable. sensor hard-coded name is "ADPS"
 	//begin will return false if initialize failed. 
@@ -318,8 +354,10 @@ void setup() {
 	
 	if (mbColorInitialized) {
 		//need rgb to cap at 255 for calculations? this isn't limiting shit.
+		//proximity sensor has a range of 4-8 inches, or 10-20cm
 		oColorSensor.setIntLimits(0, 255);
 		oColorSensor.enableColor(true);
+		oColorSensor.enableProximity(true);
 		oColorSensor.setADCGain(APDS9960_AGAIN_16X);
 		oColorSensor.enableColorInterrupt();
 		oColorSensor.setADCIntegrationTime(50);		
@@ -330,12 +368,16 @@ void setup() {
 	mbHumidityInitialized = oHumid.begin();	
 	
 	//microphone
-	//PDM.setBufferSize(MIC_SAMPLESIZE * 2);
 	PDM.onReceive(PullMicData);
 	//PDM.setGain(50);
 	mbMicrophoneStarted = PDM.begin(1, MIC_SAMPLERATE);
 	PDM.end();
-	//PDM.onReceive(GetMicrophoneData);
+	
+	mbThermalCameraStarted = oThermalCamera.begin(MLX90640_I2CADDR_DEFAULT, &Wire);
+	oThermalCamera.setMode(MLX90640_CHESS);
+	oThermalCamera.setResolution(MLX90640_ADC_18BIT);
+	oThermalCamera.setRefreshRate(MLX90640_8_HZ);
+	Wire.setClock(1000000); // max 1 MHz
 	
 	oButton2.begin();
 	oButton2.onPressed(ToggleRGBSensor);	
@@ -349,10 +391,9 @@ void setup() {
 	oButton4.begin();
 	oButton4.onPressedFor(500, SleepMode);
 	
-	//for (int oImag = 0; oImag < MICROPHONE_SAMPLES; oImag++) {
-	//	mdarrImaginary[oImag] = 0;
-	//}
-	
+	oButton5.begin();
+	oButton5.onPressed(ToggleThermal);
+		
 	GoHome();
 }
 
@@ -362,6 +403,7 @@ void loop() {
 	oButton1.read();
 	oButton3.read();
 	oButton4.read();
+	oButton5.read();
 	
 	//there's gotta be a cleaner way to do this?
 	if (oButton4.isReleased() && mbButton4Flag) {
@@ -378,6 +420,7 @@ void loop() {
 	RunRGBSensor();
 	RunClimateSensor();
 	RunMicrophone();	
+	RunThermal();
 }
 
 void SleepMode() {
@@ -534,6 +577,8 @@ void RunLeftScanner() {
 }
 
 void GoHome() {
+	//if flag set for thermal debug mode, hijack home screen?	
+	
 	//reset any previous sensor statuses
 	mnRGBCooldown = 0;
 	mnClimateCooldown = 0;
@@ -595,7 +640,8 @@ void GoHome() {
 
 	//black section for home screen title
 	tft.fillRect(232, 1, 69, 22, ST77XX_BLACK);
-	drawParamText(229, 21, "  STATUS", color_MAINTEXT);
+	//drawParamText(229, 21, "  STATUS", color_MAINTEXT);
+	drawParamText(229, 21, "  ABOUT", color_MAINTEXT);
 	
 	tft.fillRoundRect(76, 39, 14, 11, 5, color_LABELTEXT);
 	tft.fillRoundRect(76, 63, 14, 11, 5, color_LABELTEXT);
@@ -662,7 +708,12 @@ void GoHome() {
 	} else {
 		tft.fillRect(76, 181, 139, 24, color_LABELTEXT2);
 	}
-	drawParamText(174, 200, "AUDIO", ST77XX_BLACK);
+	//drawParamText(174, 200, "AUDIO", ST77XX_BLACK);
+	drawParamText(169, 200, "SONICS", ST77XX_BLACK);
+	
+	if (mbThermalCameraStarted) {
+		//show thermal camera is OK to use
+	}
 		
 }
 
@@ -752,7 +803,8 @@ void ToggleRGBSensor() {
 			
 			tft.fillRect(123, 114, 30, 8, ST77XX_BLACK);
 			tft.setFont(&lcars15pt7b);
-			drawParamText(151, 21, "CHROMATIC ANALYSIS", color_TITLETEXT);
+			//drawParamText(151, 21, "CHROMATIC ANALYSIS", color_TITLETEXT);
+			drawParamText(191, 21, "CHROMATICS", color_TITLETEXT);
 			//data labels
 			tft.setFont(&lcars11pt7b);
 			drawParamText(112, 48, "RED", color_LABELTEXT);
@@ -883,6 +935,13 @@ void RunRGBSensor() {
 					
 		//draw swatch, turn off scanner LED
 		tft.fillRoundRect(186, 189, 113, 42, 21, nRGB565);
+		uint8_t nProximity = 0;
+		nProximity = oColorSensor.readProximity();
+		//put proximity value inside color swatch rect - assume distance in mm?
+		if (nProximity > 0 && nProximity < 256) {
+			drawParamText(210, 210, String(nProximity) + "mm", ST77XX_BLACK);
+		}
+		
 		//turn off flash
 		ledBoard.clear();
 		ledBoard.show();
@@ -911,17 +970,21 @@ void ShowBatteryLevel(int nPosX, int nPosY, uint16_t nLabelColor, uint16_t nValu
 	//to-do: use global setting to enable/disable battery voltage check
 	String sBatteryStatus = "";  
 	float fBattV = analogRead(VOLT_PIN);
-	/*
+	
 	//fBattV *= 2;    // we divided by 2 (board has a resistor on this pin), so multiply back,  // Multiply by 3.3V, our reference voltage
 	//fBattV *= 3.3; 
 	//combine previous actions for brevity- multiply by 2 to adjust for resistor, then 3.3 reference voltage
 	fBattV *= 6.6;
 	fBattV /= 1024; // convert to voltage
 	//3.3 to 4.2 => subtract 3.3 (0) from current voltage. now values should be in range of 0-0.9 : multiply by 1.111, then by 100, convert result to int.
-	fBattV -= 3.3;
-	fBattV *= 111.11;
-	*/
-	int nBattPct = map(fBattV, 0, 600, 0, 101);
+	//fBattV -= 3.3;	
+	//convert voltage to a percentage
+	fBattV = fBattV * 100;
+	fBattV = constrain(fBattV, 320, 420);
+	int nBattPct = map(fBattV, 320, 420, 0, 100);
+	/* */
+	//int nBattPct = map(fBattV, 0, 600, 0, 101);
+	
 	//need to use space characters to pad string because it'll wrap back around to left edge when cursor set over 240 (height).
 	//this is a glitch of adafruit GFX library - it thinks display is 240x320 despite the rotation in setup() and setting for text wrap
 	//sBatteryStatus = "      " + String((int)fBattV);
@@ -978,7 +1041,8 @@ void ToggleClimateSensor() {
 			//small black box for "scroller" 
 			tft.fillRect(123, 86, 30, 8, ST77XX_BLACK);
 			tft.setFont(&lcars15pt7b);
-			drawParamText(174, 20, "CLIMATE ANALYSIS", color_TITLETEXT);			
+			//drawParamText(174, 20, "CLIMATE ANALYSIS", color_TITLETEXT);			
+			drawParamText(204, 20, "CLIMATE", color_TITLETEXT);
 			
 			//data labels
 			tft.setFont(&lcars11pt7b);
@@ -1229,7 +1293,9 @@ void ToggleMicrophone() {
 		tft.fillRect(0, 144, 50, 32, color_HEADER);
 		
 		tft.setFont(&lcars15pt7b);
-		drawParamText(190, 20, "AUDIO ANALYSIS", color_TITLETEXT);
+		//drawParamText(190, 20, "AUDIO ANALYSIS", color_TITLETEXT);
+		drawParamText(185, 20, "SONIC SPECTRUM", color_TITLETEXT);
+		
 		tft.setFont(&lcars11pt7b);
 		drawParamText(86 + GetBuffer(0), 48, "0", color_MAINTEXT);
 		drawParamText(116, 48, "DECIBEL", color_LABELTEXT);
@@ -1261,6 +1327,7 @@ void ToggleMicrophone() {
 		tft.drawFastVLine(61, 97, 128, color_LEGEND);
 		tft.drawFastHLine(60, 96, 4, color_LEGEND);
 		tft.drawFastHLine(60, 225, 4, color_LEGEND);
+		tft.drawFastHLine(60, 161, 4, color_LEGEND);
 		tft.drawFastVLine(311, 97, 128, color_LEGEND);
 		tft.drawFastVLine(312, 97, 128, color_LEGEND);
 		tft.drawFastHLine(308, 96, 4, color_LEGEND);
@@ -1366,6 +1433,53 @@ void RunMicrophone() {
 	}		
 	
 }	//end runmic
+
+void ToggleThermal() {
+	mbButton5Flag = !mbButton5Flag;
+	if (mbButton5Flag) {
+		tft.fillScreen(ST77XX_BLACK);
+		
+	} else {
+		
+		GoHome();
+	}
+}
+
+void RunThermal() {
+	if (!mbButton5Flag) return;	
+	int nDrawTime = 0;
+	
+	if (millis() - mnLastCameraFrame > 1) {
+		nDrawTime = 2000.0 / (millis()-mnLastCameraFrame);
+		tft.fillRect(90, 0, 40, 20, ST77XX_BLACK);
+		drawParamText(90, 20, const_cast<char*>(((String)nDrawTime).c_str()) + " FPS", color_MAINTEXT);
+	}
+	
+	if (oThermalCamera.getFrame(farrTempFrame) != 0) {
+		tft.fillRect(0, 0, 30, 20, ST77XX_BLACK);
+		drawParamText(0, 0, "Failed", ST77XX_WHITE);
+		return;
+	} else {
+		for (uint8_t nRow = 0; nRow < 24; nRow++) {
+			for (uint8_t nCol = 0; nCol < 32; nCol++) {
+				float fTemp = farrTempFrame[nRow*32 + nCol];
+				//clip temperature readings to defined range for color mapping
+				fTemp = min(fTemp, MAX_CAMERA_TEMP);
+				fTemp = max(fTemp, MIN_CAMERA_TEMP); 
+				   
+				uint8_t nColorIndex = map(fTemp, MIN_CAMERA_TEMP, MAX_CAMERA_TEMP, 0, 255);
+				nColorIndex = constrain(nColorIndex, 0, 255);
+				
+				//draw the pixels
+				tft.fillRect((mnThermalPixelWidth * nCol) + mnCameraDisplayStartX, (mnThermalPixelHeight * nRow) + mnCameraDisplayStartY, mnThermalPixelWidth, mnThermalPixelHeight, mnarrThermalDisplayColors[nColorIndex]);
+			}
+		}
+		mnLastCameraFrame = millis();
+		
+		//Serial.print(2000.0 / (millis()-timestamp)); 
+		//Serial.println(" FPS (2 frames per display)");
+	}
+}
 
 void PullMicData() {	
 	//apparently this causes issues, as this function can't access a global variable?
