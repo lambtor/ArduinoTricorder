@@ -374,10 +374,12 @@ void setup() {
 	PDM.end();
 	
 	mbThermalCameraStarted = oThermalCamera.begin(MLX90640_I2CADDR_DEFAULT, &Wire);
-	oThermalCamera.setMode(MLX90640_CHESS);
-	oThermalCamera.setResolution(MLX90640_ADC_18BIT);
-	oThermalCamera.setRefreshRate(MLX90640_8_HZ);
-	Wire.setClock(1000000); // max 1 MHz
+	if (mbThermalCameraStarted) {
+		oThermalCamera.setMode(MLX90640_CHESS);
+		oThermalCamera.setResolution(MLX90640_ADC_18BIT);
+		oThermalCamera.setRefreshRate(MLX90640_8_HZ);
+		Wire.setClock(1000000); // max 1 MHz
+	}
 	
 	oButton2.begin();
 	oButton2.onPressed(ToggleRGBSensor);	
@@ -1435,6 +1437,7 @@ void RunMicrophone() {
 }	//end runmic
 
 void ToggleThermal() {
+	if (!mbThermalCameraStarted) return;
 	mbButton5Flag = !mbButton5Flag;
 	if (mbButton5Flag) {
 		tft.fillScreen(ST77XX_BLACK);
@@ -1446,7 +1449,7 @@ void ToggleThermal() {
 }
 
 void RunThermal() {
-	if (!mbButton5Flag) return;	
+	if (!mbButton5Flag || !mbThermalCameraStarted) return;	
 	int nDrawTime = 0;
 	
 	if (millis() - mnLastCameraFrame > 1) {
