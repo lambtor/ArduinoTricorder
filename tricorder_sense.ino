@@ -255,16 +255,18 @@ EasyButton oButton5(BUTTON_BOARD);
 
 Adafruit_MLX90640 oThermalCamera;
 //temperature cutoffs are given in celsius. -12C => -10F
-#define MIN_CAMERA_TEMP -12;
-#define	MAX_CAMERA_TEMP	100; 
+const int MIN_CAMERA_TEMP = 20;
+const int MAX_CAMERA_TEMP = 35;
+ 
 float mfarrTempFrame[32*24];
 bool mbThermalCameraStarted = false;
+bool mbThermalActive = false;
 int mnLastCameraFrame = 0;
 //this must be less than 10 for all data to be displayed on 320x240. this scales display window to 256 x 192, a border of 48px all around
 uint16_t mnThermalPixelWidth = 8;
 uint16_t mnThermalPixelHeight = 8;
-uint8_t mnCameraDisplayStartX = 48;
-uint8_t mnCameraDisplayStartY = 48;
+uint8_t mnCameraDisplayStartX = 24;
+uint8_t mnCameraDisplayStartY = 24;
 //16hz ~= 16fps
 //while this is editable, it's probably not worth the time to decode and re-encode just to convert it to the desired LCARS color scheme
 const uint16_t mnarrThermalDisplayColors[] = {0x480F, 0x400F,0x400F,0x400F,0x4010,0x3810,0x3810,0x3810,0x3810,0x3010,0x3010,
@@ -372,14 +374,18 @@ void setup() {
 	//PDM.setGain(50);
 	mbMicrophoneStarted = PDM.begin(1, MIC_SAMPLERATE);
 	PDM.end();
-	
+		
+	/*
 	mbThermalCameraStarted = oThermalCamera.begin(MLX90640_I2CADDR_DEFAULT, &Wire);
 	if (mbThermalCameraStarted) {
 		oThermalCamera.setMode(MLX90640_CHESS);
 		oThermalCamera.setResolution(MLX90640_ADC_18BIT);
-		oThermalCamera.setRefreshRate(MLX90640_8_HZ);
-		Wire.setClock(1000000); // max 1 MHz
-	}
+		//minimize refresh rate since we can't turn off the camera?
+		oThermalCamera.setRefreshRate(MLX90640_0_5_HZ);
+		////Wire.setClock(1000000); // max 1 MHz
+		////Wire.setClock(4000000);
+		oThermalCamera.end();
+	}*/ 
 	
 	oButton2.begin();
 	oButton2.onPressed(ToggleRGBSensor);	
@@ -580,13 +586,13 @@ void RunLeftScanner() {
 
 void GoHome() {
 	//if flag set for thermal debug mode, hijack home screen?	
-	
 	//reset any previous sensor statuses
 	mnRGBCooldown = 0;
 	mnClimateCooldown = 0;
 	mbHomeActive = true;
 	mbRGBActive = false;
 	mbTempActive = false;
+	//oThermalCamera.setRefreshRate(MLX90640_0_5_HZ);
 	
 	mbButton1Flag = false;
 	mbButton2Flag = false;
@@ -602,6 +608,7 @@ void GoHome() {
 	mbHumidBarComplete = false;
 	mbTempBarComplete = false;
 	mbBaromBarComplete = false;
+	mbThermalActive = false;
 
 	//tft.setFont(&lcars11pt7b);
 	tft.setFont(&lcars15pt7b);
@@ -642,8 +649,8 @@ void GoHome() {
 
 	//black section for home screen title
 	tft.fillRect(232, 1, 69, 22, ST77XX_BLACK);
-	//drawParamText(229, 21, "  STATUS", color_MAINTEXT);
-	drawParamText(229, 21, "  ABOUT", color_MAINTEXT);
+	drawParamText(229, 21, "  STATUS", color_MAINTEXT);
+	//drawParamText(229, 21, "  ABOUT", color_MAINTEXT);
 	
 	tft.fillRoundRect(76, 39, 14, 11, 5, color_LABELTEXT);
 	tft.fillRoundRect(76, 63, 14, 11, 5, color_LABELTEXT);
@@ -757,6 +764,7 @@ void ToggleRGBSensor() {
 	mbTempActive = false;
 	mbHomeActive = false;
 	mbMicrophoneActive = false;
+	mbThermalActive = false;
 	mnTempTargetBar = 0;
 	mnTempCurrentBar = 0;
 	mnHumidTargetBar = 0;
@@ -806,7 +814,7 @@ void ToggleRGBSensor() {
 			tft.fillRect(123, 114, 30, 8, ST77XX_BLACK);
 			tft.setFont(&lcars15pt7b);
 			//drawParamText(151, 21, "CHROMATIC ANALYSIS", color_TITLETEXT);
-			drawParamText(191, 21, "CHROMATICS", color_TITLETEXT);
+			drawParamText(211, 21, "CHROMATICS", color_TITLETEXT);
 			//data labels
 			tft.setFont(&lcars11pt7b);
 			drawParamText(112, 48, "RED", color_LABELTEXT);
@@ -941,7 +949,7 @@ void RunRGBSensor() {
 		nProximity = oColorSensor.readProximity();
 		//put proximity value inside color swatch rect - assume distance in mm?
 		if (nProximity > 0 && nProximity < 256) {
-			drawParamText(210, 210, String(nProximity) + "mm", ST77XX_BLACK);
+			drawParamText(240 + GetBuffer(nProximity), 225, String(nProximity) + "MM", ST77XX_BLACK);
 		}
 		
 		//turn off flash
@@ -1005,6 +1013,7 @@ void ToggleClimateSensor() {
 	//to-do: reset any microphone sensor values
 	mbMicrophoneActive = false;
 	mbHomeActive = false;
+	mbThermalActive = false;
 	
 	if (mbButton1Flag) {
 		if (!mbTempActive) {
@@ -1044,7 +1053,7 @@ void ToggleClimateSensor() {
 			tft.fillRect(123, 86, 30, 8, ST77XX_BLACK);
 			tft.setFont(&lcars15pt7b);
 			//drawParamText(174, 20, "CLIMATE ANALYSIS", color_TITLETEXT);			
-			drawParamText(204, 20, "CLIMATE", color_TITLETEXT);
+			drawParamText(244, 20, "CLIMATE", color_TITLETEXT);
 			
 			//data labels
 			tft.setFont(&lcars11pt7b);
@@ -1209,6 +1218,7 @@ void ToggleMicrophone() {
 	mnRGBCooldown = 0;
 	mnClimateCooldown = 0;	
 	mbMicrophoneActive = false;
+	mbThermalActive = false;
 	//reset any temperature app values
 	mbHomeActive = false;
 	mbTempActive = false;
@@ -1439,11 +1449,19 @@ void RunMicrophone() {
 void ToggleThermal() {
 	if (!mbThermalCameraStarted) return;
 	mbButton5Flag = !mbButton5Flag;
+	
 	if (mbButton5Flag) {
 		tft.fillScreen(ST77XX_BLACK);
-		
+		mbHomeActive = false;
+		mbRGBActive = false;
+		mbThermalActive = true;
+		mbMicrophoneActive = false;
+		mbTempActive = false;
+		oThermalCamera.setRefreshRate(MLX90640_8_HZ);
+		//Wire.setClock(1000000);
 	} else {
-		
+		//Wire.setClock(F_CPU);
+		oThermalCamera.setRefreshRate(MLX90640_0_5_HZ);
 		GoHome();
 	}
 }
@@ -1452,20 +1470,22 @@ void RunThermal() {
 	if (!mbButton5Flag || !mbThermalCameraStarted) return;	
 	int nDrawTime = 0;
 	
+	/*
 	if (millis() - mnLastCameraFrame > 1) {
 		nDrawTime = 2000.0 / (millis()-mnLastCameraFrame);
 		tft.fillRect(90, 0, 40, 20, ST77XX_BLACK);
-		drawParamText(90, 20, const_cast<char*>(((String)nDrawTime).c_str()) + " FPS", color_MAINTEXT);
-	}
+		drawParamText(90, 10, ((String)nDrawTime) + " FPS", color_MAINTEXT);
+	} */
 	
-	if (oThermalCamera.getFrame(farrTempFrame) != 0) {
+	if (oThermalCamera.getFrame(mfarrTempFrame) != 0) {
 		tft.fillRect(0, 0, 30, 20, ST77XX_BLACK);
 		drawParamText(0, 0, "Failed", ST77XX_WHITE);
 		return;
-	} else {
+		//20fps max
+	} else if (mnLastCameraFrame = 0 || millis() - mnLastCameraFrame >= 30) {
 		for (uint8_t nRow = 0; nRow < 24; nRow++) {
 			for (uint8_t nCol = 0; nCol < 32; nCol++) {
-				float fTemp = farrTempFrame[nRow*32 + nCol];
+				float fTemp = mfarrTempFrame[nRow*32 + nCol];
 				//clip temperature readings to defined range for color mapping
 				fTemp = min(fTemp, MAX_CAMERA_TEMP);
 				fTemp = max(fTemp, MIN_CAMERA_TEMP); 
