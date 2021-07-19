@@ -11,8 +11,9 @@
 #include <Adafruit_Sensor.h>	//wtf is this??
 #include <PDM.h>
 #include <Adafruit_ZeroFFT.h>
-#include <SPIMemory.h>
+//#include <SPIMemory.h>
 #include <Adafruit_MLX90640.h>
+#include <Adafruit_LIS3MDL.h>	//magnetometer, for door close detection
 
 
 // need to remove hyphens from header filenames or exception will get thrown
@@ -240,7 +241,7 @@ short mTargetMicDisplay[FFT_BINCOUNT] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 bool mbButton1Flag = false;
 bool mbButton2Flag = false;
 bool mbButton3Flag = false;
-bool mbButton5Flag = false;
+bool mbButton7Flag = false;
 EasyButton oButton1(BUTTON_1_PIN);
 EasyButton oButton2(BUTTON_2_PIN);
 EasyButton oButton3(BUTTON_3_PIN);
@@ -248,9 +249,15 @@ EasyButton oButton3(BUTTON_3_PIN);
 EasyButton oButton4(REED_PIN);
 bool mbButton4Flag = false;
 
+Adafruit_LIS3MDL oMagneto;
+bool mbMagnetometer = false;
+float mfMagnetX, mfMagnetY, mfMagnetz;
+int mnLastMagnetCheck = 0;
+int mnMagnetInterval = 1000;
+
 //board button digital pin 7 - use for "pause scanner" or thermal camera toggle
-EasyButton oButton5(BUTTON_BOARD);
-//bool mbButton5Toggled = false;
+EasyButton oButton7(BUTTON_BOARD);
+//bool mbButton7Toggled = false;
 
 
 Adafruit_MLX90640 oThermalCamera;
@@ -258,9 +265,11 @@ Adafruit_MLX90640 oThermalCamera;
 const int MIN_CAMERA_TEMP = 20;
 const int MAX_CAMERA_TEMP = 35;
  
-float mfarrTempFrame[32*24];
+//need array length of 768 as this is 32*24 resolution
+float mfarrTempFrame[768];
 bool mbThermalCameraStarted = false;
 bool mbThermalActive = false;
+uint8_t mnThermalCameraInterval = 16;
 int mnLastCameraFrame = 0;
 //this must be less than 10 for all data to be displayed on 320x240. this scales display window to 256 x 192, a border of 48px all around
 uint16_t mnThermalPixelWidth = 8;
@@ -374,17 +383,32 @@ void setup() {
 	//PDM.setGain(50);
 	mbMicrophoneStarted = PDM.begin(1, MIC_SAMPLERATE);
 	PDM.end();
-		
+	
+	//all magnet settings - data rate of 1.25Hz a bit faster than 1 per second
+	oMagneto.setPerformanceMode(LIS3MDL_LOWPOWERMODE);
+	oMagneto.setOperationMode(LIS3MDL_CONTINUOUSMODE);
+	//oMagneto.setDataRate(LIS3MDL_DATARATE_1_25_HZ);
+	//oMagneto.setIntThreshold(500);
+	//can be 4, 8, 12, 16
+	oMagneto.setRange(LIS3MDL_RANGE_4_GAUSS);
+	
+	mbMagnetometer = oMagneto.begin_I2C();
+	
+	
 	/*
 	mbThermalCameraStarted = oThermalCamera.begin(MLX90640_I2CADDR_DEFAULT, &Wire);
 	if (mbThermalCameraStarted) {
 		oThermalCamera.setMode(MLX90640_CHESS);
 		oThermalCamera.setResolution(MLX90640_ADC_18BIT);
 		//minimize refresh rate since we can't turn off the camera?
-		oThermalCamera.setRefreshRate(MLX90640_0_5_HZ);
+		oThermalCamera.setRefreshRate(MLX90640_1_HZ);
 		////Wire.setClock(1000000); // max 1 MHz
-		////Wire.setClock(4000000);
-		oThermalCamera.end();
+		//TWIM_FREQUENCY_FREQUENCY_K100 is default for board?
+		//TWIM_FREQUENCY_FREQUENCY_K250
+		//TWIM_FREQUENCY_FREQUENCY_K400		
+		//need to modify wire_nrf52.cpp to support 
+		//TWIM_FREQUENCY_FREQUENCY_K1000
+		////Wire.setClock(TWIM_FREQUENCY_FREQUENCY_K400);
 	}*/ 
 	
 	oButton2.begin();
@@ -396,11 +420,12 @@ void setup() {
 	oButton3.begin();
 	oButton3.onPressed(ToggleMicrophone);
 	
-	oButton4.begin();
-	oButton4.onPressedFor(500, SleepMode);
+	//convert this from dedicated reed switch to instead use magnetometer
+	//oButton4.begin();
+	//oButton4.onPressedFor(500, SleepMode);
 	
-	oButton5.begin();
-	oButton5.onPressed(ToggleThermal);
+	oButton7.begin();
+	oButton7.onPressed(ToggleThermal);
 		
 	GoHome();
 }
@@ -408,15 +433,22 @@ void setup() {
 void loop() {
 	//this toggles RGB scanner
 	oButton2.read();
+	//toggle climate
 	oButton1.read();
+	//toggle microphone
 	oButton3.read();
-	oButton4.read();
-	oButton5.read();
+	//oButton4.read();
+	oButton7.read();
 	
-	//there's gotta be a cleaner way to do this?
-	if (oButton4.isReleased() && mbButton4Flag) {
-		ActiveMode();
-	}
+	//if magnet read in Z direction is over a threshold, trigger sleep.
+	//if (millis() - mnLastMagnetCheck >= mnMagnetInterval) {		
+		//if oMagneto.z >= something
+	//SleepMode();
+	//else {
+	//	ActiveMode();
+	//}
+	//oMagneto.z
+	
 	
 	RunNeoPixelColor(POWER_LED_PIN);
 	RunNeoPixelColor(NEOPIXEL_BOARD_LED_PIN);
@@ -754,6 +786,13 @@ void RunHome() {
 		String sUptime =  (nUptimeHours > 9 ? String(nUptimeHours) : "0" + String(nUptimeHours) ) + ":" + (nDisplayMinutes > 9 ? String(nDisplayMinutes) : "0" + String(nDisplayMinutes)) + "." + (nDisplaySeconds > 9 ? String(nDisplaySeconds) : "0" + String(nDisplaySeconds));
 		tft.fillRect(180, 58, 58, 25, ST77XX_BLACK);
 		drawParamText(185, 75, sUptime, color_MAINTEXT);
+		
+		if (mbMagnetometer && millis() - mnLastMagnetCheck >= mnMagnetInterval) {
+			oMagneto.read();
+			drawParamText(270, 50, (String)oMagneto.z, color_MAINTEXT);
+			mnLastMagnetCheck = millis();
+		}
+		
 		mnLastUpdateHome = millis();
 	}
 }
@@ -1448,45 +1487,60 @@ void RunMicrophone() {
 
 void ToggleThermal() {
 	if (!mbThermalCameraStarted) return;
-	mbButton5Flag = !mbButton5Flag;
+	mbButton7Flag = !mbButton7Flag;
 	
-	if (mbButton5Flag) {
+	if (mbButton7Flag) {
 		tft.fillScreen(ST77XX_BLACK);
 		mbHomeActive = false;
 		mbRGBActive = false;
 		mbThermalActive = true;
 		mbMicrophoneActive = false;
 		mbTempActive = false;
+		//camera data refresh rate needs to be twice as high as expected display frame rate
 		oThermalCamera.setRefreshRate(MLX90640_8_HZ);
 		//Wire.setClock(1000000);
-	} else {
-		//Wire.setClock(F_CPU);
+	} else {		
 		oThermalCamera.setRefreshRate(MLX90640_0_5_HZ);
+		//TWI_CLOCK is 1kHz
+		//Wire.setClock(TWI_CLOCK);
 		GoHome();
 	}
 }
 
 void RunThermal() {
-	if (!mbButton5Flag || !mbThermalCameraStarted) return;	
-	int nDrawTime = 0;
+	if (!mbButton7Flag) return;	
 	
-	/*
-	if (millis() - mnLastCameraFrame > 1) {
-		nDrawTime = 2000.0 / (millis()-mnLastCameraFrame);
-		tft.fillRect(90, 0, 40, 20, ST77XX_BLACK);
-		drawParamText(90, 10, ((String)nDrawTime) + " FPS", color_MAINTEXT);
-	} */
-	
-	if (oThermalCamera.getFrame(mfarrTempFrame) != 0) {
-		tft.fillRect(0, 0, 30, 20, ST77XX_BLACK);
-		drawParamText(0, 0, "Failed", ST77XX_WHITE);
+	if (!mbThermalCameraStarted) {
+		tft.fillRect(0, 0, 30, 30, ST77XX_BLACK);
+		drawParamText(0, 20, "Disabled", ST77XX_WHITE);
+		//set value for screen blanked so this doesn't constantly get redrawn
 		return;
-		//20fps max
-	} else if (mnLastCameraFrame = 0 || millis() - mnLastCameraFrame >= 30) {
+	}
+		
+	//use 30fps cap to restrict how often it tries to pull camera data
+	//need 2 data frames for each displayed frame, as it only pulls half the range at a time.
+	
+	
+	//if (oThermalCamera.getFrame(mfarrTempFrame) != 0) {
+	//	tft.fillRect(0, 0, 30, 20, ST77XX_BLACK);
+	//	drawParamText(0, 0, "Failed", ST77XX_WHITE);
+	//	return;
+	//	//20fps max
+	//} else 
+		
+	//cap data frame rate at 60fps, as that'd suggest 30fps draw, and that'd be fuckin insane performance
+	if (millis() - mnLastCameraFrame >= mnThermalCameraInterval) {
+		if (oThermalCamera.getFrame(mfarrTempFrame) != 0) {
+			tft.fillRect(0, 0, 30, 20, ST77XX_BLACK);
+			drawParamText(0, 0, "Failed", ST77XX_WHITE);
+			return;
+		}
+		
 		for (uint8_t nRow = 0; nRow < 24; nRow++) {
 			for (uint8_t nCol = 0; nCol < 32; nCol++) {
 				float fTemp = mfarrTempFrame[nRow*32 + nCol];
 				//clip temperature readings to defined range for color mapping
+				//may want to increase color fidelity to accomodate larger range?
 				fTemp = min(fTemp, MAX_CAMERA_TEMP);
 				fTemp = max(fTemp, MIN_CAMERA_TEMP); 
 				   
