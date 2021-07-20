@@ -262,8 +262,9 @@ EasyButton oButton7(BUTTON_BOARD);
 
 Adafruit_MLX90640 oThermalCamera;
 //temperature cutoffs are given in celsius. -12C => -10F
-const int MIN_CAMERA_TEMP = 20;
-const int MAX_CAMERA_TEMP = 35;
+int MIN_CAMERA_TEMP = 20;
+int MAX_CAMERA_TEMP = 35;
+int THERMAL_CAMERA_VISIBLE_DEPTH = 8;
  
 //need array length of 768 as this is 32*24 resolution
 float mfarrTempFrame[768];
@@ -271,7 +272,8 @@ bool mbThermalCameraStarted = false;
 bool mbThermalActive = false;
 uint8_t mnThermalCameraInterval = 16;
 int mnLastCameraFrame = 0;
-//this must be less than 10 for all data to be displayed on 320x240. this scales display window to 256 x 192, a border of 48px all around
+//this must be less than 10 for all data to be displayed on 320x240. 
+//this scales display window to 256 x 192, a border of 24px all around
 uint16_t mnThermalPixelWidth = 8;
 uint16_t mnThermalPixelHeight = 8;
 uint8_t mnCameraDisplayStartX = 24;
@@ -291,17 +293,16 @@ const uint16_t mnarrThermalDisplayColors[] = {0x480F, 0x400F,0x400F,0x400F,0x401
 0xBEE0,0xBEE0,0xC6E0,0xC6E0,0xCEE0,0xCEE0,0xD6E0,0xD700,0xDF00,0xDEE0,0xDEC0,0xDEA0,0xDE80,0xDE80,0xE660,0xE640,0xE620,0xE600,0xE5E0,0xE5C0,
 0xE5A0,0xE580,0xE560,0xE540,0xE520,0xE500,0xE4E0,0xE4C0,0xE4A0,0xE480,0xE460,0xEC40,0xEC20,0xEC00,0xEBE0,0xEBC0,0xEBA0,0xEB80,0xEB60,0xEB40,
 0xEB20,0xEB00,0xEAE0,0xEAC0,0xEAA0,0xEA80,0xEA60,0xEA40,0xF220,0xF200,0xF1E0,0xF1C0,0xF1A0,0xF180,0xF160,0xF140,0xF100,0xF0E0,0xF0C0,0xF0A0,
-0xF080,0xF060,0xF040,0xF020,0xF800,};
+0xF080,0xF060,0xF040,0xF020,0xF800};
 
 //to-do:
 //left side led stacking mode for countdown to color scanner action
-//top button toggle for thermal imaging camera, thermal camera screen
 //rearrange pin functions to leverage analog input for potentiometer
-//map ID led color to potentiometer. 
+//map ID led color to potentiometer
 //	top edge of rotation -> all WHITE
 //	rest of colors cycle through color spectrum blue > green > yellow > orange > red > pink > purple
 //refactor home screen to report status of thermal camera connection
-//to-do: have device broadcast for bluetooth connectivity, allow selection of ID led color and preferred "THEME"
+//to-do: have device broadcast for bluetooth connectivity, allow selection of preferred "THEME"
 //between ds9, voyager, tng
 
 void setup() {
@@ -386,7 +387,7 @@ void setup() {
 	
 	//all magnet settings - data rate of 1.25Hz a bit faster than 1 per second
 	oMagneto.setPerformanceMode(LIS3MDL_LOWPOWERMODE);
-	oMagneto.setOperationMode(LIS3MDL_CONTINUOUSMODE);
+	//oMagneto.setOperationMode(LIS3MDL_CONTINUOUSMODE);
 	//oMagneto.setDataRate(LIS3MDL_DATARATE_1_25_HZ);
 	//oMagneto.setIntThreshold(500);
 	//can be 4, 8, 12, 16
@@ -394,18 +395,24 @@ void setup() {
 	
 	mbMagnetometer = oMagneto.begin_I2C();
 	
+	//to-do: set min/max thermal camera range as +- based on ambient temperature reading?
 	
 	/*
 	mbThermalCameraStarted = oThermalCamera.begin(MLX90640_I2CADDR_DEFAULT, &Wire);
 	if (mbThermalCameraStarted) {
 		oThermalCamera.setMode(MLX90640_CHESS);
 		oThermalCamera.setResolution(MLX90640_ADC_18BIT);
-		//minimize refresh rate since we can't turn off the camera?
+		//minimize refresh rate since we can't turn off the camera? 
+		//refresh rate will be double viable display frame rate, as need 2 data pulls per frame
+		//1Hz refresh rate works when clock is at 100kHz
 		oThermalCamera.setRefreshRate(MLX90640_1_HZ);
-		////Wire.setClock(1000000); // max 1 MHz
+		//4Hz refresh rate works when clock is at 400kHz - 2fps
+		oThermalCamera.setRefreshRate(MLX90640_4_HZ);		
+		////Wire.setClock(1000000); // max 1 MHz gets translated to 400kHz with adafruit "driver"
 		//TWIM_FREQUENCY_FREQUENCY_K100 is default for board?
 		//TWIM_FREQUENCY_FREQUENCY_K250
 		//TWIM_FREQUENCY_FREQUENCY_K400		
+		//8fps for screen is viable if clock speed is 800kHz & camera refresh rate is 16hz
 		//need to modify wire_nrf52.cpp to support 
 		//TWIM_FREQUENCY_FREQUENCY_K1000
 		////Wire.setClock(TWIM_FREQUENCY_FREQUENCY_K400);
@@ -709,6 +716,8 @@ void GoHome() {
 	//device version
 	drawParamText(235, 100, "           " + String(DEVICE_VERSION), color_MAINTEXT);
 	
+	//may need refactor if thermal camera is viable, to show 4 statuses instead of 3
+	
 	//color_LABELTEXT2 brown, labeltext3 pinkish, labeltext4 is tan/orange
 	//show sensor statuses		
 	//environment = temperature, humidity sensors
@@ -789,7 +798,10 @@ void RunHome() {
 		
 		if (mbMagnetometer && millis() - mnLastMagnetCheck >= mnMagnetInterval) {
 			oMagneto.read();
-			drawParamText(270, 50, (String)oMagneto.z, color_MAINTEXT);
+			//output raw data to screen - test this with magnet behind 4mm of PLA ~
+			drawParamText(270, 25, (String)oMagneto.x, color_MAINTEXT);
+			drawParamText(270, 50, (String)oMagneto.y, color_MAINTEXT);
+			drawParamText(270, 75, (String)oMagneto.z, color_MAINTEXT);
 			mnLastMagnetCheck = millis();
 		}
 		
@@ -817,6 +829,16 @@ void ToggleRGBSensor() {
 	
 	if (mbButton2Flag) {
 		//to-do: if sensor disabled or not started, pulse message to display
+		if (!mbColorInitialized) {
+			if (millis() - mnLastRGBScan > mnRGBScanInterval) {
+				tft.fillScreen(ST77XX_BLACK);
+				drawParamText(211, 21, "CHROMATICS", color_TITLETEXT);
+				drawParamText(110, 169, "SENSOR OFFLINE", color_MAINTEXT);
+				mnLastRGBScan = millis();		
+			}		
+			return;
+		}
+		
 		if (!mbRGBActive) {
 			mbRGBActive = true;
 			//load rgb scanner screen - this is done once to improve perf
@@ -883,7 +905,7 @@ void ToggleRGBSensor() {
 
 void RunRGBSensor() {
 	//exit if button config says this shouldn't be running.
-	if (!mbRGBActive) return;
+	if (!mbRGBActive) return;	
 	
 	//erase values if interval has passed
 	if (millis() - mnLastRGBScan > mnRGBScanInterval) {
