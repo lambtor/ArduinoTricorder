@@ -281,7 +281,7 @@ bool mbThermalCameraStarted = false;
 bool mbThermalActive = false;
 //this interval caps draw and thermal data frame rates. should not really do any limiting as everything will run slower than 30fps
 uint8_t mnThermalCameraInterval = 16;
-//int mnLastCameraFrame = 0;
+int mnLastCameraFrame = 0;
 //this must be less than 10 for all data to be displayed on 320x240. 
 //this scales display window to 256 x 192, a border of 24px all around
 uint16_t mnThermalPixelWidth = 8;
@@ -475,7 +475,10 @@ void loop() {
 			//SleepMode();
 		//} else if (oMagneto.z < 5000 && mbSleepMode) {
 	//	ActiveMode();
-	//}	
+	//}
+
+//delay(1500);
+//SleepMode();	
 	
 	RunNeoPixelColor(POWER_LED_PIN);
 	RunNeoPixelColor(NEOPIXEL_BOARD_LED_PIN);
@@ -493,13 +496,11 @@ void loop() {
 void SleepMode() {
 	mbSleepMode = true;
 	//to-do: turn all lights OFF, turn off screen, reset all "status" variables
-	//if (mbButton4Toggled) {
-		tft.fillScreen(ST77XX_BLACK);		
-		tft.enableSleep(true);
-		//need wired pin to set backlight low here
-		//void sleep(void) { tft.sendCommand(ST77XX_SLPIN); }
-		//void wake(void) { tft.sendCommand(ST77XX_SLPOUT); }
-	//} 	
+	//tft.fillScreen(ST77XX_BLACK);		
+	//tft.enableSleep(true);
+	//need wired pin to set backlight low here
+	//void sleep(void) { tft.sendCommand(ST77XX_SLPIN); }
+	//void wake(void) { tft.sendCommand(ST77XX_SLPOUT); }
 }
 
 void ActiveMode() {	
@@ -1595,57 +1596,61 @@ void RunThermal() {
 	//} else 
 	int nStatus = 0;
 	
-	
+	//mnThermalCameraInterval
+	//pimoroni camera "bottom" of view is section with pin holes
 	//cap data frame rate at 60fps, as that'd suggest 30fps draw, and that'd be fuckin insane performance
-	//if (millis() - mnLastCameraFrame >= mnThermalCameraInterval) {
+	if (millis() - mnLastCameraFrame >= mnThermalCameraInterval) {
 
-	//iterate through full frame capture, then do 1 draw with all values
-	for (byte i = 0; i < 2; i++) {
-		uint16_t arrTempFrameRaw[834];
-		int nStatus = MLX90640_GetFrameData(mbCameraAddress, arrTempFrameRaw);
+		//iterate through full frame capture, then do 1 draw with all values
+		for (byte i = 0; i < 2; i++) {
+			uint16_t arrTempFrameRaw[834];
+			int nStatus = MLX90640_GetFrameData(mbCameraAddress, arrTempFrameRaw);
+			
+			if (mfTR == 0.0) {
+				//mfVdd = MLX90640_GetVdd
+				mfTA = MLX90640_GetTa(arrTempFrameRaw, &moCameraParams);
+				mfTR = mfTA - TA_SHIFT;		
+			}
+			MLX90640_CalculateTo(arrTempFrameRaw, &moCameraParams, mfCameraEmissivity, 0.0, mfarrTempFrame);		
+		}
 		
-		if (mfTR == 0.0) {
-			//mfVdd = MLX90640_GetVdd
-			mfTA = MLX90640_GetTa(arrTempFrameRaw, &moCameraParams);
-			mfTR = mfTA - TA_SHIFT;		
+		//if (oThermalCamera.getFrame(mfarrTempFrame) != 0) {
+		/*
+		if (MLX90640_GetFrameData(mbCameraAddress, arrTempFrameRaw) != 0) {
+			tft.fillRect(0, 0, 30, 20, ST77XX_BLACK);
+			drawParamText(0, 0, "Failed", ST77XX_WHITE);
+			return;
+		} */
+		
+		for (uint8_t nRow = 0; nRow < 24; nRow++) {
+			for (uint8_t nCol = 0; nCol < 32; nCol++) {		
+				int fTemp = mfarrTempFrame[nRow*32 + nCol];
+				/*if (nRow == 0 && nCol == 0) {
+					tft.fillRect(0,0, 50, 24, ST77XX_BLACK);
+					drawParamText(0,12, (String)fTemp, color_MAINTEXT);
+				}*/
+				
+				//clip temperature readings to defined range for color mapping
+				//may want to increase color fidelity to accomodate larger range?
+				//fTemp = min(fTemp, MAX_CAMERA_TEMP);
+				//fTemp = max(fTemp, MIN_CAMERA_TEMP); 
+				//if ((nRow == 0 || nRow == 12 || nRow == 18) && (nCol == 0 || nCol == 16 || nCol == 28)) {
+				//	tft.fillRect(nCol*8, nRow*7, 24, 16, ST77XX_BLUE);
+				//	drawParamText(nCol * 8, nRow * 8, (String)fTemp, ST77XX_WHITE);
+				//}
+				
+				uint8_t nColorIndex = map(fTemp, 20, 35, 0, 255);
+				nColorIndex = constrain(nColorIndex, 0, 255);
+				
+				//draw the pixels
+				tft.fillRect((mnThermalPixelWidth * nCol) + mnCameraDisplayStartX, (mnThermalPixelHeight * nRow) + mnCameraDisplayStartY, mnThermalPixelWidth, mnThermalPixelHeight, mnarrThermalDisplayColors[nColorIndex]);
+			}
 		}
-		MLX90640_CalculateTo(arrTempFrameRaw, &moCameraParams, mfCameraEmissivity, mfTR, mfarrTempFrame);
-	
-	}
-	
-	//if (oThermalCamera.getFrame(mfarrTempFrame) != 0) {
-	/*
-	if (MLX90640_GetFrameData(mbCameraAddress, arrTempFrameRaw) != 0) {
-		tft.fillRect(0, 0, 30, 20, ST77XX_BLACK);
-		drawParamText(0, 0, "Failed", ST77XX_WHITE);
-		return;
-	} */
-	
-	for (uint8_t nRow = 0; nRow < 24; nRow++) {
-		for (uint8_t nCol = 0; nCol < 32; nCol++) {		
-			int fTemp = mfarrTempFrame[nRow*32 + nCol];
-			/*if (nRow == 0 && nCol == 0) {
-				tft.fillRect(0,0, 50, 24, ST77XX_BLACK);
-				drawParamText(0,12, (String)fTemp, color_MAINTEXT);
-			}*/
-			
-			//clip temperature readings to defined range for color mapping
-			//may want to increase color fidelity to accomodate larger range?
-			//fTemp = min(fTemp, MAX_CAMERA_TEMP);
-			//fTemp = max(fTemp, MIN_CAMERA_TEMP); 
-			   
-			uint8_t nColorIndex = map(fTemp, mfTR-THERMAL_CAMERA_VISIBLE_DEPTH, mfTR+THERMAL_CAMERA_VISIBLE_DEPTH, 0, 255);
-			nColorIndex = constrain(nColorIndex, 0, 255);
-			
-			//draw the pixels
-			tft.fillRect((mnThermalPixelWidth * nCol) + mnCameraDisplayStartX, (mnThermalPixelHeight * nRow) + mnCameraDisplayStartY, mnThermalPixelWidth, mnThermalPixelHeight, mnarrThermalDisplayColors[nColorIndex]);
-		}
-	}
-		//mnLastCameraFrame = millis();
+		mnLastCameraFrame = millis();
 		
 		//Serial.print(2000.0 / (millis()-timestamp)); 
 		//Serial.println(" FPS (2 frames per display)");
-	//}
+	}
 }
 
 void PullMicData() {	
