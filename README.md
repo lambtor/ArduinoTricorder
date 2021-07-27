@@ -14,7 +14,7 @@ Sound playback <br/>
 via trigger on <br/>
 separate board:       OK<br/>
 Magnetometer for <br/>
-door close to sleep:  OK
+door close to sleep:  OK<br/>
 ID LED (8) color <br/>
 change via <br/>
 potentiometer:  in progress
