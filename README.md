@@ -8,7 +8,7 @@ WIP list of assets that could be used with arduino tricorder
 <strong>Power LED:</strong>             Functional, will either cycle colors or show color based on battery power %<br/>
 <strong>Button Support:</strong>        OK - using easybutton library pulled from elsewhere on github<br/>
 <strong>Microphone Spectrum <br/>
-<strong>Visualization:</strong>         OK - not the most accurate thing, but has a very high refresh rate.  Uses AdafruitZero_FFT library for FFT calculations.<br/>
+Visualization:</strong>         OK - not the most accurate thing, but has a very high refresh rate.  Uses AdafruitZero_FFT library for FFT calculations.<br/>
 <strong>Thermal camera:</strong>       OK<br/>
 <strong>Sound playback <br/>
 via trigger on <br/>
