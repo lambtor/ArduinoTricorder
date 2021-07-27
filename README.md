@@ -15,7 +15,7 @@ Draw operations on the display from the arduino aren't that fast.  The FFT draw 
 
 ![decibel demo gif](https://github.com/lambtor/ArduinoTricorder/blob/master/decibel.gif?raw=true)
 
-![board pinout](https://github.com/lambtor/ArduinoTricorder/blob/master/tricorderv10-pinout.jpg)
+![board pinout](https://github.com/lambtor/ArduinoTricorder/blob/master/tricorderV10-pinout.jpg)
 
 to do: 
 sound playback via separate wav/ogg board<br/>
