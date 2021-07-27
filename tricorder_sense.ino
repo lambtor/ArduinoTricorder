@@ -551,6 +551,14 @@ void ActiveMode() {
 	GoHome();
 }
 
+void ActivateSound() {
+	digitalWrite(SOUND_TRIGGER_PIN, LOW);
+}
+
+void DisableSound() {
+	digitalWrite(SOUND_TRIGGER_PIN, HIGH);
+}
+
 void RunNeoPixelColor(int nPin) {
 	unsigned long lTimer = millis();
 	if (nPin == POWER_LED_PIN) {
@@ -588,7 +596,7 @@ void RunNeoPixelColor(int nPin) {
 			//colors range is purple > blue > green > yellow > orange > red > pink > white
 			//pin range is 0-1023, so use value mod 128 to divide into 8 sections?  need tests on actual raw values received
 			uint16_t nScrollerValue = analogRead(PIN_SCROLL_INPUT);
-			drawParamText(250, 75, (String)nScrollerValue, color_MAINTEXT);
+			//drawParamText(250, 75, (String)nScrollerValue, color_MAINTEXT);
 			ledPwrStrip.setPixelColor(1, mnIDLEDColorscape[nScrollerValue % 128]);
 			
 						
@@ -696,6 +704,7 @@ void RunLeftScanner() {
 
 void GoHome() {
 	ResetWireClock();
+	DisableSound();
 	//if flag set for thermal debug mode, hijack home screen?	
 	//reset any previous sensor statuses
 	mnRGBCooldown = 0;
@@ -922,7 +931,7 @@ void ToggleRGBSensor() {
 	mbBaromBarComplete = false;
 	//to-do: reset any microphone sensor values
 	
-	if (mbButton2Flag) {
+	if (mbButton2Flag) {		
 		//to-do: if sensor disabled or not started, pulse message to display
 		if (!mbColorInitialized) {
 			if (millis() - mnLastRGBScan > mnRGBScanInterval) {
@@ -935,6 +944,7 @@ void ToggleRGBSensor() {
 		}
 		
 		if (!mbRGBActive) {
+			ActivateSound();
 			mbRGBActive = true;
 			//load rgb scanner screen - this is done once to improve perf
 			tft.fillScreen(ST77XX_BLACK);
@@ -1172,8 +1182,9 @@ void ToggleClimateSensor() {
 	mbHomeActive = false;
 	mbThermalActive = false;
 	
-	if (mbButton1Flag) {
+	if (mbButton1Flag) {		
 		if (!mbTempActive) {
+			ActivateSound();
 			mbTempActive = true;
 			//load temp scanner screen - this is done once to improve perf
 			tft.fillScreen(ST77XX_BLACK);
@@ -1371,6 +1382,7 @@ void RunClimateSensor() {
 
 void ToggleMicrophone() {
 	ResetWireClock();
+	
 	mbButton3Flag = !mbButton3Flag;
 	//reset any rgb sensor values
 	mnRGBCooldown = 0;
@@ -1391,6 +1403,7 @@ void ToggleMicrophone() {
 	mbBaromBarComplete = false;
 	
 	if (mbButton3Flag) {
+		DisableSound();
 		//show audio screen
 		//tft.fillScreen(0x6B6D);
 		tft.fillScreen(ST77XX_BLACK);
@@ -1620,6 +1633,7 @@ void ToggleThermal() {
 		//oThermalCamera.setRefreshRate(MLX90640_4_HZ);
 		SetThermalClock();
 		MLX90640_SetRefreshRate(mbCameraAddress, 0x04);
+		ActivateSound();
 		
 		//to-do: draw border for thermal camera visualization
 		
