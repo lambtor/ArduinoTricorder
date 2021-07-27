@@ -11,12 +11,12 @@
 #include <Adafruit_Sensor.h>	//wtf is this??
 #include <PDM.h>
 #include <Adafruit_ZeroFFT.h>
-//#include <SPIMemory.h>
-//#include <Adafruit_MLX90640.h>
 #include <MLX90640_API.h>
 #include <MLX90640_I2C_Driver.h>
 #include <Adafruit_LIS3MDL.h>	//magnetometer, for door close detection
 
+//full arduino pinout for this board is here:
+/*https://github.com/adafruit/Adafruit_nRF52_Arduino/blob/master/variants/feather_nrf52840_sense/variant.h*/
 
 // need to remove hyphens from header filenames or exception will get thrown
 #include "Fonts/lcars15pt7b.h"
@@ -24,75 +24,84 @@
 
 // For the breakout board, you can use any 2 or 3 pins.
 // These pins will also work for the 1.8" TFT shield.
-//need to use pin 10 for TFT_CS, as pin 9 is analog 7. analog 7 is the only way to get current voltage, which is used for battery %
+//need to use pin 6 for TFT_CS, as pin 20 is analog 7. analog 7 is the only way to get current voltage, which is used for battery %
+
 //MISO is not required for screen to work - this is used by mem card only?
-#define TFT_CS 		10
+#define TFT_CS 						6
 // SD card select pin
-#define SD_CS 		11 //- can't use pin 4 as that is for blue connection led
-#define TFT_RST 	-1
-#define TFT_DC 		5
-#define USE_SD_CARD 1
+//#define SD_CS 			11 	//- can't use pin 4 as that is for blue connection led
+#define TFT_RST 						-1
+#define TFT_DC 						5
+#define USE_SD_CARD 			0
 
 //pin 9 is free, as pin_a6 is for vbat and is otherwise known as digital 20
-#define VOLT_PIN 			PIN_A6		//INPUT_POWER_PIN
-#define SLEEP_PIN			13
-#define REED_PIN			12
+#define VOLT_PIN 					PIN_A6		//INPUT_POWER_PIN
 #define SOUND_TRIGGER_PIN	9
 
 //buttons, scroller	- d2 pin actually pin #2
 //we can't use pin 13 for buttons, as that is connected directly to a red LED on the board.
 //button on the board is connected to pin 7.  TX is pin 0, RX is pin 1 - these are normally used for serial communication
 //you can't use 13 as an input, but it can be an output for maybe a single LED?
-//#define BUTTON_1_PIN		PIN_A4
-//#define BUTTON_2_PIN		PIN_A5
-//#define BUTTON_3_PIN		(0)
 
-//#define BUTTON_1_PIN		(0)	//PIN_AREF
-#define BUTTON_1_PIN		PIN_AREF
-#define BUTTON_2_PIN		PIN_A4
-#define BUTTON_3_PIN		PIN_A5
-//#define BUTTON_4_PIN		PIN_NFC2
-#define BUTTON_SLEEP_PIN	12
-#define BUTTON_BOARD		7
+#define PIN_D2						PIN_NFC2
+//#define BUTTON_1_PIN		PIN_AREF
+//#define BUTTON_2_PIN		PIN_A4
+//#define BUTTON_3_PIN		PIN_A5
+
+#define BUTTON_1_PIN				PIN_SERIAL1_RX
+#define BUTTON_2_PIN				PIN_SERIAL1_TX
+#define BUTTON_3_PIN				PIN_D2
+
+//pin 7 is the board button
+#define BUTTON_BOARD				PIN_BUTTON1
+
+#define PIN_SCROLL_BASE			PIN_A0
+#define PIN_SCROLL_INPUT			PIN_A1
 
 // A0 is pin14. can't use that as an output pin?		A0 = 14, A3 = 17
-#define SCAN_LED_PIN_1 	PIN_A0	//14
-#define SCAN_LED_PIN_2 	PIN_A1	//15
-#define SCAN_LED_PIN_3 	PIN_A2	//16
-#define SCAN_LED_PIN_4 	PIN_A3	//17
+//#define SCAN_LED_PIN_1 	PIN_A0	//14
+//#define SCAN_LED_PIN_2 	PIN_A1	//15
+//#define SCAN_LED_PIN_3 	PIN_A2	//16
+//#define SCAN_LED_PIN_4 	PIN_A3	//17
+#define SCAN_LED_PIN_1 			PIN_A2
+#define SCAN_LED_PIN_2 			PIN_A3
+#define SCAN_LED_PIN_3 			PIN_A4
+#define SCAN_LED_PIN_4 			PIN_A5
 
 #define SCAN_LED_BRIGHTNESS 	32
 
-// power LED. must use an unreserved pin for this.
-// cdn-learn.adafruit.com/assets/assets/000/046/243/large1024/adafruit_products_Feather_M0_Adalogger_v2.2-1.png?1504885273
-#define POWER_LED_PIN 			6
-#define NEOPIXEL_BRIGHTNESS 	64
+//neopixel power LED. must use an unreserved pin for this.  PWR, ID, EMRG all use this pin
+#define POWER_LED_PIN 					10
+#define NEOPIXEL_BRIGHTNESS 		64
 #define NEOPIXEL_LED_COUNT 		3
 // built-in pins: D4 = blue conn LED, 8 = neopixel on board, D13 = red LED next to micro usb port
-#define NEOPIXEL_BOARD_LED_PIN	8
-#define BOARD_REDLED_PIN 		13
-#define BOARD_BLUELED_PIN 		4
+//#define NEOPIXEL_BOARD_LED_PIN	8
+//#define PIN_NEOPIXEL 8
+//#define BOARD_REDLED_PIN 		13
+//#define BOARD_BLUELED_PIN 		4
+//#define LED_RED 							13
+//#define LED_BLUE						4
 //#define PIN_SERIAL1_RX       (1)
 //#define PIN_SERIAL1_TX       (0)
 
 //system os version #. max 3 digits
-#define DEVICE_VERSION			"0.85"
+#define DEVICE_VERSION			"0.86"
 
 // TNG colors here
 #define color_SWOOP				0xF7B3
 #define color_MAINTEXT			0x9E7F
 //#define color_MAINTEXT			0xC69F
-#define color_LABELTEXT			0x841E
-#define color_HEADER			0xFEC8
+#define color_LABELTEXT		0x841E
+#define color_HEADER				0xFEC8
 #define color_TITLETEXT			0xFEC8
 //196,187,145
 #define color_LABELTEXT2		0xC5D2
 //204,174,220
 #define color_LABELTEXT3		0xCD7B
 #define color_LABELTEXT4		0xEE31
-#define color_LEGEND			0x6A62
+#define color_LEGEND				0x6A62
 //210,202,157
-#define color_FFT				0xDEB5
+#define color_FFT					0xDEB5
 
 // ds9
 //#define color_SWOOP			0xD4F0
@@ -116,7 +125,7 @@
 #define RGBto565(r,g,b) ((((r) & 0xF8) << 8) | (((g) & 0xFC) << 3) | ((b) >> 3))
 
 Adafruit_NeoPixel ledPwrStrip(NEOPIXEL_LED_COUNT, POWER_LED_PIN, NEO_GRB + NEO_KHZ800);
-Adafruit_NeoPixel ledBoard(1, NEOPIXEL_BOARD_LED_PIN, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel ledBoard(1, PIN_NEOPIXEL, NEO_GRB + NEO_KHZ800);
 
 // do not fuck with this. 2.0 IS THE BOARD - this call uses hardware SPI
 Adafruit_ST7789 tft = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_RST);
@@ -154,6 +163,8 @@ unsigned long mnLastUpdateBoardRedLED = 0;
 unsigned long mnLastUpdateBoardBlueLED = 0;
 bool mbBoardRedLED = false;
 bool mbBoardBlueLED = false;
+//colors range is purple > blue > green > yellow > orange > red > pink > white
+const uint32_t mnIDLEDColorscape[] = {0x8010,0x0010,0x0400,0x5C60,0x8300,0x8000,0x8208,0x8410};
 
 //color sensor
 bool mbColorInitialized = false;
@@ -206,11 +217,11 @@ extern PDMClass PDM;
 #define MIC_SAMPLESIZE 		256
 //16k is the ONLY SUPPORTED SAMPLE RATE!
 //#define MIC_SAMPLERATE		16000
-#define MIC_AMPLITUDE		1000          // Depending on audio source level, you may need to alter this value. Can be used as a 'sensitivity' control.
-#define DECIMATION			64
+#define MIC_AMPLITUDE			1000          // Depending on audio source level, you may need to alter this value. Can be used as a 'sensitivity' control.
+#define DECIMATION				64
 #define FFT_REFERENCELINES	16
-//#define FFT_MAX				150
-#define FFT_BINCOUNT        16
+//#define FFT_MAX					150
+#define FFT_BINCOUNT        	16
 #define FFT_BARHEIGHTMAX	64
 
 #define GRAPH_OFFSET 10
@@ -228,7 +239,6 @@ volatile int mnSamplesRead = 0;
 double mdarrActual[MIC_SAMPLESIZE];
 double mdarrImaginary[MIC_SAMPLESIZE];
 int mnMaxDBValue = 0;
-//unsigned long mnLastDBRead
 
 // a windowed sinc filter for 44 khz, 64 samples
 //uint16_t marrSincFilter[DECIMATION] = {0, 2, 9, 21, 39, 63, 94, 132, 179, 236, 302, 379, 467, 565, 674, 792, 920, 1055, 1196, 1341, 1487, 1633, 1776, 1913, 2042, 2159, 2263, 2352, 2422, 2474, 2506, 2516, 2506, 2474, 2422, 2352, 2263, 2159, 2042, 1913, 1776, 1633, 1487, 1341, 1196, 1055, 920, 792, 674, 565, 467, 379, 302, 236, 179, 132, 94, 63, 39, 21, 9, 2, 0, 0};
@@ -247,9 +257,7 @@ bool mbButton7Flag = false;
 EasyButton oButton1(BUTTON_1_PIN);
 EasyButton oButton2(BUTTON_2_PIN);
 EasyButton oButton3(BUTTON_3_PIN);
-//reed switch sleep mode - may be better to wire this directly from display backlight pin to ground
-//EasyButton oButton4(REED_PIN);
-//bool mbButton4Flag = false;
+
 bool mbSleepMode = false;
 
 Adafruit_LIS3MDL oMagneto;
@@ -258,18 +266,17 @@ float mfMagnetX, mfMagnetY, mfMagnetz;
 int mnLastMagnetCheck = 0;
 int mnMagnetInterval = 1000;
 
-//board button digital pin 7 - use for "pause scanner" or thermal camera toggle
+//board button digital pin 7 - use for thermal camera toggle
 EasyButton oButton7(BUTTON_BOARD);
 //bool mbButton7Toggled = false;
-
 
 //Adafruit_MLX90640 oThermalCamera;
 const byte mbCameraAddress = 0x33;
 paramsMLX90640 moCameraParams;
 #define TA_SHIFT 8
 //temperature cutoffs are given in celsius. -12C => -10F
-//int MIN_CAMERA_TEMP = 20;
-//int MAX_CAMERA_TEMP = 35;
+int MIN_CAMERA_TEMP = 20;
+int MAX_CAMERA_TEMP = 35;
 int THERMAL_CAMERA_VISIBLE_DEPTH = 8;
  
 //need array length of 768 as this is 32*24 resolution
@@ -290,6 +297,9 @@ uint8_t mnCameraDisplayStartX = 24;
 uint8_t mnCameraDisplayStartY = 24;
 //16hz ~= 16fps
 //while this is editable, it's probably not worth the time to decode and re-encode just to convert it to the desired LCARS color scheme
+//lowest value is super dark purple: RGB 78,0,128
+//highest value (0xF800) was 255,0,0
+//2021.07.26	expanding color map to go from red to white for top-most end of temp range supported
 const uint16_t mnarrThermalDisplayColors[] = {0x480F, 0x400F,0x400F,0x400F,0x4010,0x3810,0x3810,0x3810,0x3810,0x3010,0x3010,
 0x3010,0x2810,0x2810,0x2810,0x2810,0x2010,0x2010,0x2010,0x1810,0x1810,0x1811,0x1811,0x1011,0x1011,0x1011,0x0811,0x0811,0x0811,0x0011,0x0011,
 0x0011,0x0011,0x0011,0x0031,0x0031,0x0051,0x0072,0x0072,0x0092,0x00B2,0x00B2,0x00D2,0x00F2,0x00F2,0x0112,0x0132,0x0152,0x0152,0x0172,0x0192,
@@ -303,7 +313,11 @@ const uint16_t mnarrThermalDisplayColors[] = {0x480F, 0x400F,0x400F,0x400F,0x401
 0xBEE0,0xBEE0,0xC6E0,0xC6E0,0xCEE0,0xCEE0,0xD6E0,0xD700,0xDF00,0xDEE0,0xDEC0,0xDEA0,0xDE80,0xDE80,0xE660,0xE640,0xE620,0xE600,0xE5E0,0xE5C0,
 0xE5A0,0xE580,0xE560,0xE540,0xE520,0xE500,0xE4E0,0xE4C0,0xE4A0,0xE480,0xE460,0xEC40,0xEC20,0xEC00,0xEBE0,0xEBC0,0xEBA0,0xEB80,0xEB60,0xEB40,
 0xEB20,0xEB00,0xEAE0,0xEAC0,0xEAA0,0xEA80,0xEA60,0xEA40,0xF220,0xF200,0xF1E0,0xF1C0,0xF1A0,0xF180,0xF160,0xF140,0xF100,0xF0E0,0xF0C0,0xF0A0,
-0xF080,0xF060,0xF040,0xF020,0xF800};
+0xF080,0xF060,0xF040,0xF020,0xF800 
+,0xF841,0xF8A2,0xF8E3,0xF945,0xF986,0xF9E7,0xFA28,0xFA8A,0xFACB,0xFB2C,0xFB6D,0xFBCF,0xFC10,0xFC71,0xFCB2,0xFD14,0xFD55,0xFDB6,0xFDF7,0xFD59
+,0xFE9A,0xFEFB,0xFF3C,0xFF9E};
+//this is used to determine size of our color map
+uint8_t mnColorArraySize = sizeof(mnarrThermalDisplayColors) / sizeof(uint16_t);
 
 //to-do:
 //left side led stacking mode for countdown to color scanner action
@@ -341,30 +355,36 @@ void setup() {
 	pinMode(SCAN_LED_PIN_3, OUTPUT);
 	pinMode(SCAN_LED_PIN_4, OUTPUT);
 	
+	pinMode(PIN_SCROLL_BASE, OUTPUT);
+	//analog write values can go from 0 to 255. analogRead can go from 0 to 1023
+	analogWrite(PIN_SCROLL_BASE, 255);
+	pinMode(PIN_SCROLL_INPUT, INPUT);
+	
 	//set output for board non-neopixel LEDs
-	pinMode(BOARD_REDLED_PIN, OUTPUT);
-	pinMode(BOARD_BLUELED_PIN, OUTPUT);
+	pinMode(LED_RED, OUTPUT);
+	pinMode(LED_BLUE, OUTPUT);
+	
+	pinMode(SOUND_TRIGGER_PIN, OUTPUT);
 	
 	//this will be used to "turn off" the display via reed switch when the door is closed - this is just pulling backlight to ground.
-	pinMode(SLEEP_PIN, OUTPUT);
+	//pinMode(SLEEP_PIN, OUTPUT);
 	//this will also cause the red LED on the board to ALWAYS be on, so you know if sleep is activated while door closed.
 	//digitalWrite(SLEEP_PIN, HIGH);
 	
 	//AREF pin is an analog reference and set low by default. need to write high to this to initialize it
 	//or it'll be read as low and boot the tricorder into environment section
 	pinMode(BUTTON_1_PIN, OUTPUT);
+	pinMode(BUTTON_2_PIN, OUTPUT);
+	pinMode(BUTTON_3_PIN, OUTPUT);
 	digitalWrite(BUTTON_1_PIN, HIGH);
+	digitalWrite(BUTTON_2_PIN, HIGH);
+	digitalWrite(BUTTON_3_PIN, HIGH);
 	delay(10);
 	
 	pinMode(BUTTON_1_PIN, INPUT);
 	pinMode(BUTTON_2_PIN, INPUT);
 	pinMode(BUTTON_3_PIN, INPUT);
-	//this is required so the reed switch can be read.  
-	//by default, pin 12 is low, and we need this high so the switch can be pulled low when triggered.
-	pinMode(REED_PIN, OUTPUT);
-	digitalWrite(REED_PIN, HIGH);
-	delay(10);
-	pinMode(REED_PIN, INPUT);	
+	
 	pinMode(VOLT_PIN, INPUT);	
 	pinMode(BUTTON_BOARD, INPUT);
 	
@@ -397,10 +417,8 @@ void setup() {
 	
 	//all magnet settings - data rate of 1.25Hz a bit faster than 1 per second
 	oMagneto.setPerformanceMode(LIS3MDL_LOWPOWERMODE);
-	//oMagneto.setOperationMode(LIS3MDL_CONTINUOUSMODE);
-	//oMagneto.setDataRate(LIS3MDL_DATARATE_1_25_HZ);
 	//oMagneto.setIntThreshold(500);
-	//can be 4, 8, 12, 16
+	//can be 4, 8, 12, 16 - don't need high range here, as magnet in door will be pretty strong and very close
 	oMagneto.setRange(LIS3MDL_RANGE_4_GAUSS);
 	
 	mbMagnetometer = oMagneto.begin_I2C();
@@ -409,11 +427,10 @@ void setup() {
 	SetThermalClock();
 	uint16_t oCameraParams[832];
 	int nStatus = -1;
-	//uint16_t mnCameraDumpEE[832];
+	
 	nStatus = MLX90640_DumpEE(mbCameraAddress, oCameraParams);
-	//mbThermalCameraStarted = oThermalCamera.begin(MLX90640_I2CADDR_DEFAULT, &Wire);
-	if (nStatus != 0) {
-	} else {
+	
+	if (nStatus == 0) {
 		mbThermalCameraStarted = true;
 		nStatus = MLX90640_ExtractParameters(oCameraParams, &moCameraParams);
 		//start at 1hz
@@ -446,11 +463,7 @@ void setup() {
 	
 	oButton3.begin();
 	oButton3.onPressed(ToggleMicrophone);
-	
-	//convert this from dedicated reed switch to instead use magnetometer
-	//oButton4.begin();
-	//oButton4.onPressedFor(500, SleepMode);
-	
+		
 	oButton7.begin();
 	oButton7.onPressed(ToggleThermal);
 		
@@ -458,30 +471,32 @@ void setup() {
 }
 
 void loop() {
-	//this toggles RGB scanner
-	oButton2.read();
+	//if magnet read in Z direction is over a threshold, trigger sleep.
+	//check this first in the loop, as everything else depends on it
+	//magnet from speaker throws z = ~ -14000, no magnets has z idle at ~ -500
+	//use z > 5000 ?
+	if (millis() - mnLastMagnetCheck >= mnMagnetInterval) {		
+		if (!mbSleepMode && oMagneto.z >= 5000) {
+			SleepMode();
+		} else if (mbSleepMode && oMagneto.z < 5000) {
+			ActiveMode();
+		}
+		mnLastMagnetCheck = millis();
+	}
+	
+	if (mbSleepMode) return;
+	
 	//toggle climate
 	oButton1.read();
+	//this toggles RGB scanner
+	oButton2.read();	
 	//toggle microphone
 	oButton3.read();
-	//oButton4.read();
+	//toggle thermal camera
 	oButton7.read();
-	
-	//if magnet read in Z direction is over a threshold, trigger sleep.
-	//magnet from speaker throws z = ~ -14000
-	//use z > 5000 ?
-	//if (millis() - mnLastMagnetCheck >= mnMagnetInterval) {		
-		//if (oMagneto.z >= 5000 && !mbSleepMode) {
-			//SleepMode();
-		//} else if (oMagneto.z < 5000 && mbSleepMode) {
-	//	ActiveMode();
-	//}
-
-//delay(1500);
-//SleepMode();	
-	
+			
 	RunNeoPixelColor(POWER_LED_PIN);
-	RunNeoPixelColor(NEOPIXEL_BOARD_LED_PIN);
+	RunNeoPixelColor(PIN_NEOPIXEL);
 	RunLeftScanner();
 	RunHome();
 	//blink board LEDs
@@ -495,17 +510,44 @@ void loop() {
 
 void SleepMode() {
 	mbSleepMode = true;
-	//to-do: turn all lights OFF, turn off screen, reset all "status" variables
-	//tft.fillScreen(ST77XX_BLACK);		
-	//tft.enableSleep(true);
+	//reset all "status" variables
+	GoHome();
+	//turn off screen 
+	tft.fillScreen(ST77XX_BLACK);		
 	//need wired pin to set backlight low here
+	//digitalWrite(DISPLAY_BACKLIGHT_PIN, LOW);
+	tft.enableSleep(true);
+	//tft.enableDisplay(false);	
 	//void sleep(void) { tft.sendCommand(ST77XX_SLPIN); }
 	//void wake(void) { tft.sendCommand(ST77XX_SLPOUT); }
+	
+	//set sound trigger pin HIGH, as low causes playback
+	digitalWrite(SOUND_TRIGGER_PIN, LOW);
+	
+	//board edge LEDs off
+	digitalWrite(LED_RED, LOW);
+	digitalWrite(LED_BLUE, LOW);
+	//board "power" / "camera flash" LED off
+	ledBoard.setPixelColor(0, 0, 0, 0);
+	ledBoard.show();
+	//left scanner LEDs off
+	analogWrite(SCAN_LED_PIN_1, 0);
+	analogWrite(SCAN_LED_PIN_2, 0);
+	analogWrite(SCAN_LED_PIN_3, 0);
+	analogWrite(SCAN_LED_PIN_4, 0);
+	//set chained neopixels off - PWR, EMRG, ID
+	ledPwrStrip.setPixelColor(0, 0, 0, 0);
+	ledPwrStrip.setPixelColor(1, 0, 0, 0);
+	ledPwrStrip.setPixelColor(2, 0, 0, 0);
+	ledPwrStrip.show();
+	mbLEDIDSet = false;
 }
 
 void ActiveMode() {	
 	mbSleepMode = false;
 	tft.enableSleep(false);
+	//tft.enableDisplay(true);
+	
 	GoHome();
 }
 
@@ -541,6 +583,14 @@ void RunNeoPixelColor(int nPin) {
 				mbLEDIDSet = true;
 				//ledPwrStrip.setPixelColor(2, 128, 0, 0);
 			}
+			
+			//set ID LED color based on value pulled from A1, edge prong of scroll potentiometer
+			//colors range is purple > blue > green > yellow > orange > red > pink > white
+			//pin range is 0-1023, so use value mod 128 to divide into 8 sections?  need tests on actual raw values received
+			uint16_t nScrollerValue = analogRead(PIN_SCROLL_INPUT);
+			drawParamText(250, 75, (String)nScrollerValue, color_MAINTEXT);
+			ledPwrStrip.setPixelColor(1, mnIDLEDColorscape[nScrollerValue % 128]);
+			
 						
 			mnLastUpdatePower = lTimer;
 			//ledPwrStrip.show();
@@ -562,7 +612,7 @@ void RunNeoPixelColor(int nPin) {
 			ledPwrStrip.show();
 			mnLastUpdateEMRG = lTimer;
 		}		
-	} else if (nPin == NEOPIXEL_BOARD_LED_PIN) {
+	} else if (nPin == PIN_NEOPIXEL) {
 		//unsure if want to use, as this needs to be sensor flash.
 		if (!mbRGBActive) {
 			if ((lTimer - mnLastUpdateBoard) > mnBoardLEDInterval) {
@@ -602,18 +652,18 @@ void RunBoardLEDs() {
 		//flip LED state flag, set state based on new flag
 		mbBoardRedLED = !mbBoardRedLED;
 		if (mbBoardRedLED) {
-			digitalWrite(BOARD_REDLED_PIN, HIGH);
+			digitalWrite(LED_RED, HIGH);
 		} else {
-			digitalWrite(BOARD_REDLED_PIN, LOW);
+			digitalWrite(LED_RED, LOW);
 		}
 		mnLastUpdateBoardRedLED = lTimer;
 	}
 	if ((lTimer - mnLastUpdateBoardBlueLED) > mnBoardBlueLEDInterval) {
 		mbBoardBlueLED = !mbBoardBlueLED;
 		if (mbBoardRedLED) {
-			digitalWrite(BOARD_BLUELED_PIN, HIGH);
+			digitalWrite(LED_BLUE, HIGH);
 		} else {
-			digitalWrite(BOARD_BLUELED_PIN, LOW);
+			digitalWrite(LED_BLUE, LOW);
 		}
 		mnLastUpdateBoardBlueLED = lTimer;
 	}	
@@ -653,7 +703,6 @@ void GoHome() {
 	mbHomeActive = true;
 	mbRGBActive = false;
 	mbTempActive = false;
-	//oThermalCamera.setRefreshRate(MLX90640_0_5_HZ);
 	
 	mbButton1Flag = false;
 	mbButton2Flag = false;
@@ -822,14 +871,20 @@ void RunHome() {
 		//drawParamText(250,75, (String)TWI_CLOCK, color_MAINTEXT);
 		
 		//if (mbMagnetometer && millis() - mnLastMagnetCheck >= mnMagnetInterval) {
-			oMagneto.read();
+		//	oMagneto.read();
 			//output raw data to screen - test this with magnet behind 4mm of PLA ~
 			//drawParamText(250, 25, (String)oMagneto.x, color_MAINTEXT);
 			//drawParamText(250, 50, (String)oMagneto.y, color_MAINTEXT);
-			tft.fillRect(250, 60, 40, 20, ST77XX_BLACK);
-			drawParamText(250, 75, (String)oMagneto.z, color_MAINTEXT);
-			mnLastMagnetCheck = millis();
+		//	tft.fillRect(250, 60, 40, 20, ST77XX_BLACK);
+		//	drawParamText(250, 75, (String)oMagneto.z, color_MAINTEXT);
+		//	mnLastMagnetCheck = millis();
 		//}
+		
+		//show potentiometer data on home screen
+		uint16_t nScrollerValue = analogRead(PIN_SCROLL_INPUT);
+		drawParamText(250, 75, (String)nScrollerValue, color_MAINTEXT);
+		
+		
 		
 		mnLastUpdateHome = millis();
 	}
@@ -837,14 +892,14 @@ void RunHome() {
 
 void ResetWireClock() {
 	//Wire.endTransmission(MLX90640_I2CADDR_DEFAULT);
-	//all sensors on i2c use 100,000 rate.
+	//all sensors on i2c use 100,000 rate. adafruit board definitions force any call to this under 100k to use 100k.
 	Wire.flush();
 	Wire.setClock(100000);
 }
 
 void SetThermalClock() {
-	//max viable speed on this board. used only for thermal camera
-	Wire.flush();
+	//max viable speed on this board. used only for thermal camera. adafruit board definitions force any call to this over 400k to use 400k.
+	Wire.flush();	
 	Wire.setClock(400000);
 }
 
@@ -1566,6 +1621,8 @@ void ToggleThermal() {
 		SetThermalClock();
 		MLX90640_SetRefreshRate(mbCameraAddress, 0x04);
 		
+		//to-do: draw border for thermal camera visualization
+		
 	} else {		
 		//oThermalCamera.setRefreshRate(MLX90640_0_5_HZ);
 		MLX90640_SetRefreshRate(mbCameraAddress, 0x01);
@@ -1579,32 +1636,21 @@ void RunThermal() {
 	
 	if (!mbThermalCameraStarted) {
 		tft.fillRect(0, 0, 30, 30, ST77XX_BLACK);
-		drawParamText(0, 20, "Disabled", ST77XX_WHITE);
+		drawParamText(150, 100, "THERMALOPTICS OFFLINE", color_HEADER);
 		//set value for screen blanked so this doesn't constantly get redrawn
 		return;
 	}
 		
-	//use 30fps cap to restrict how often it tries to pull camera data
-	//need 2 data frames for each displayed frame, as it only pulls half the range at a time.
-	
-	
-	//if (oThermalCamera.getFrame(mfarrTempFrame) != 0) {
-	//	tft.fillRect(0, 0, 30, 20, ST77XX_BLACK);
-	//	drawParamText(0, 0, "Failed", ST77XX_WHITE);
-	//	return;
-	//	//20fps max
-	//} else 
-	int nStatus = 0;
-	
-	//mnThermalCameraInterval
 	//pimoroni camera "bottom" of view is section with pin holes
-	//cap data frame rate at 60fps, as that'd suggest 30fps draw, and that'd be fuckin insane performance
+	//use 30fps cap to restrict how often it tries to pull camera data, or this will block button press polling
+	//need 2 data frames for each displayed frame, as it only pulls half the range at a time.
 	if (millis() - mnLastCameraFrame >= mnThermalCameraInterval) {
 
 		//iterate through full frame capture, then do 1 draw with all values
 		for (byte i = 0; i < 2; i++) {
 			uint16_t arrTempFrameRaw[834];
 			int nStatus = MLX90640_GetFrameData(mbCameraAddress, arrTempFrameRaw);
+			if (nStatus != 0) return;
 			
 			if (mfTR == 0.0) {
 				//mfVdd = MLX90640_GetVdd
@@ -1614,21 +1660,9 @@ void RunThermal() {
 			MLX90640_CalculateTo(arrTempFrameRaw, &moCameraParams, mfCameraEmissivity, 0.0, mfarrTempFrame);		
 		}
 		
-		//if (oThermalCamera.getFrame(mfarrTempFrame) != 0) {
-		/*
-		if (MLX90640_GetFrameData(mbCameraAddress, arrTempFrameRaw) != 0) {
-			tft.fillRect(0, 0, 30, 20, ST77XX_BLACK);
-			drawParamText(0, 0, "Failed", ST77XX_WHITE);
-			return;
-		} */
-		
 		for (uint8_t nRow = 0; nRow < 24; nRow++) {
 			for (uint8_t nCol = 0; nCol < 32; nCol++) {		
 				int fTemp = mfarrTempFrame[nRow*32 + nCol];
-				/*if (nRow == 0 && nCol == 0) {
-					tft.fillRect(0,0, 50, 24, ST77XX_BLACK);
-					drawParamText(0,12, (String)fTemp, color_MAINTEXT);
-				}*/
 				
 				//clip temperature readings to defined range for color mapping
 				//may want to increase color fidelity to accomodate larger range?
@@ -1638,9 +1672,9 @@ void RunThermal() {
 				//	tft.fillRect(nCol*8, nRow*7, 24, 16, ST77XX_BLUE);
 				//	drawParamText(nCol * 8, nRow * 8, (String)fTemp, ST77XX_WHITE);
 				//}
-				
-				uint8_t nColorIndex = map(fTemp, 20, 35, 0, 255);
-				nColorIndex = constrain(nColorIndex, 0, 255);
+				//mnarrThermalDisplayColors
+				uint8_t nColorIndex = map(fTemp, MIN_CAMERA_TEMP, MAX_CAMERA_TEMP, 0, mnColorArraySize);
+				nColorIndex = constrain(nColorIndex, 0, mnColorArraySize);
 				
 				//draw the pixels
 				tft.fillRect((mnThermalPixelWidth * nCol) + mnCameraDisplayStartX, (mnThermalPixelHeight * nRow) + mnCameraDisplayStartY, mnThermalPixelWidth, mnThermalPixelHeight, mnarrThermalDisplayColors[nColorIndex]);
@@ -1648,17 +1682,12 @@ void RunThermal() {
 		}
 		mnLastCameraFrame = millis();
 		
-		//Serial.print(2000.0 / (millis()-timestamp)); 
-		//Serial.println(" FPS (2 frames per display)");
 	}
 }
 
 void PullMicData() {	
-	//apparently this causes issues, as this function can't access a global variable?
-	//if (mbMicrophoneActive == true) {	
-	//no idea how to do this.  read() ONLY WORKS FOR SAMPLE RATE OF 16000!
+	//read() ONLY WORKS FOR SAMPLE RATE OF 16000!
 	int nAvailable = PDM.available();
-	//drawParamText(200, 100, String(nAvailable), ST77XX_WHITE);
 	//mnSamplesRead = PDM.read(mnarrSampleData, MIC_SAMPLESIZE);
 	PDM.read(mnarrSampleData, nAvailable);
 	mnSamplesRead = nAvailable / 2;
