@@ -141,6 +141,8 @@ bool mbCycleBoardColor = false;
 int mnBoardColor = 4;
 //power interval doesn't need to check more than every 30 seconds
 int mnPowerLEDInterval = 30000;
+int mnIDLEDInterval = 1000;
+unsigned long mnLastUpdateIDLED = 0;
 int mnEMRGLEDInterval = 110;
 int mnEMRGMinStrength = 8;
 int mnEMRGMaxStrength = 212;
@@ -286,7 +288,7 @@ float mfTA = 0.0;
 float mfCameraEmissivity = 0.95;
 bool mbThermalCameraStarted = false;
 bool mbThermalActive = false;
-//this interval caps draw and thermal data frame rates. should not really do any limiting as everything will run slower than 30fps
+//this interval caps draw and thermal data frame rates. camera data will run slower than 30fps, but this throttle is needed to allow button press event polling
 uint8_t mnThermalCameraInterval = 16;
 int mnLastCameraFrame = 0;
 //this must be less than 10 for all data to be displayed on 320x240. 
@@ -586,23 +588,28 @@ void RunNeoPixelColor(int nPin) {
 				}
 								
 			}
-			if (!mbLEDIDSet) {
-				ledPwrStrip.setPixelColor(1, 90, 140, 0);
-				mbLEDIDSet = true;
-				//ledPwrStrip.setPixelColor(2, 128, 0, 0);
-			}
-			
+			//if (!mbLEDIDSet) {
+				//ledPwrStrip.setPixelColor(1, 90, 140, 0);
+				//mbLEDIDSet = true;
+				////ledPwrStrip.setPixelColor(2, 128, 0, 0);
+			//}
+						
+			mnLastUpdatePower = lTimer;
+			//ledPwrStrip.show();
+		}
+		
+		//need to poll ID LED separate from power, as PWR only updates every 30 seconds
+		if (mnLastUpdateIDLED == 0 || ((lTimer - mnLastUpdateIDLED) > mnIDLEDInterval)) {
 			//set ID LED color based on value pulled from A1, edge prong of scroll potentiometer
 			//colors range is purple > blue > green > yellow > orange > red > pink > white
 			//pin range is 0-1023, so use value mod 128 to divide into 8 sections?  need tests on actual raw values received
 			uint16_t nScrollerValue = analogRead(PIN_SCROLL_INPUT);
 			//drawParamText(250, 75, (String)nScrollerValue, color_MAINTEXT);
 			ledPwrStrip.setPixelColor(1, mnIDLEDColorscape[nScrollerValue % 128]);
-			
-						
-			mnLastUpdatePower = lTimer;
-			//ledPwrStrip.show();
-		} 
+			mnLastUpdateIDLED = lTimer;
+		}
+		
+		//throb EMRG LED
 		if ((lTimer - mnLastUpdateEMRG) > mnEMRGLEDInterval) {
 			int nCurrentEMRG = mnEMRGCurrentStrength;
 			int nEMRGIncrement = (mnEMRGMaxStrength - mnEMRGMinStrength) / (mnEMRGLEDInterval / 8);
@@ -620,6 +627,7 @@ void RunNeoPixelColor(int nPin) {
 			ledPwrStrip.show();
 			mnLastUpdateEMRG = lTimer;
 		}		
+		
 	} else if (nPin == PIN_NEOPIXEL) {
 		//unsure if want to use, as this needs to be sensor flash.
 		if (!mbRGBActive) {
@@ -680,6 +688,11 @@ void RunBoardLEDs() {
 void ActivateFlash() {
 	//all neopixel objects are chains, so have to call it by addr
 	ledBoard.setPixelColor(0, 255, 255, 255);
+	ledBoard.show();
+}
+
+void DisableFlash() {
+	ledBoard.setPixelColor(0, 0, 0, 0);
 	ledBoard.show();
 }
 
