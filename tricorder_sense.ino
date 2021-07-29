@@ -367,6 +367,7 @@ void setup() {
 	pinMode(LED_BLUE, OUTPUT);
 	
 	pinMode(SOUND_TRIGGER_PIN, OUTPUT);
+	digitalWrite(SOUND_TRIGGER_PIN, HIGH);
 	
 	//this will be used to "turn off" the display via reed switch when the door is closed - this is just pulling backlight to ground.
 	//pinMode(SLEEP_PIN, OUTPUT);
@@ -524,7 +525,7 @@ void SleepMode() {
 	//void wake(void) { tft.sendCommand(ST77XX_SLPOUT); }
 	
 	//set sound trigger pin HIGH, as low causes playback
-	digitalWrite(SOUND_TRIGGER_PIN, LOW);
+	digitalWrite(SOUND_TRIGGER_PIN, HIGH);
 	
 	//board edge LEDs off
 	digitalWrite(LED_RED, LOW);
