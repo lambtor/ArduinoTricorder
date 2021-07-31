@@ -14,6 +14,7 @@
 #include <MLX90640_API.h>
 #include <MLX90640_I2C_Driver.h>
 #include <Adafruit_LIS3MDL.h>	//magnetometer, for door close detection
+//#include <SPIMemory.h>
 
 //full arduino pinout for this board is here:
 /*https://github.com/adafruit/Adafruit_nRF52_Arduino/blob/master/variants/feather_nrf52840_sense/variant.h*/
@@ -43,20 +44,19 @@
 //button on the board is connected to pin 7.  TX is pin 0, RX is pin 1 - these are normally used for serial communication
 //you can't use 13 as an input, but it can be an output for maybe a single LED?
 
-#define PIN_D2						PIN_NFC2
+//#define PIN_D2						PIN_NFC1
 //#define BUTTON_1_PIN		PIN_AREF
 //#define BUTTON_2_PIN		PIN_A4
 //#define BUTTON_3_PIN		PIN_A5
 
 #define BUTTON_1_PIN				PIN_SERIAL1_RX
 #define BUTTON_2_PIN				PIN_SERIAL1_TX
-#define BUTTON_3_PIN				PIN_D2
+#define BUTTON_3_PIN				11
 
 //pin 7 is the board button
 #define BUTTON_BOARD				PIN_BUTTON1
 
-#define PIN_SCROLL_BASE			PIN_A0
-#define PIN_SCROLL_INPUT			PIN_A1
+#define PIN_SCROLL_INPUT			PIN_A0
 
 // A0 is pin14. can't use that as an output pin?		A0 = 14, A3 = 17
 //#define SCAN_LED_PIN_1 	PIN_A0	//14
@@ -273,7 +273,7 @@ EasyButton oButton7(BUTTON_BOARD);
 //bool mbButton7Toggled = false;
 
 //Adafruit_MLX90640 oThermalCamera;
-const byte mbCameraAddress = 0x33;
+const uint8_t mbCameraAddress = 0x33;
 paramsMLX90640 moCameraParams;
 #define TA_SHIFT 8
 //temperature cutoffs are given in celsius. -12C => -10F
@@ -315,7 +315,8 @@ const uint16_t mnarrThermalDisplayColors[] = {0x480F, 0x400F,0x400F,0x400F,0x401
 0xBEE0,0xBEE0,0xC6E0,0xC6E0,0xCEE0,0xCEE0,0xD6E0,0xD700,0xDF00,0xDEE0,0xDEC0,0xDEA0,0xDE80,0xDE80,0xE660,0xE640,0xE620,0xE600,0xE5E0,0xE5C0,
 0xE5A0,0xE580,0xE560,0xE540,0xE520,0xE500,0xE4E0,0xE4C0,0xE4A0,0xE480,0xE460,0xEC40,0xEC20,0xEC00,0xEBE0,0xEBC0,0xEBA0,0xEB80,0xEB60,0xEB40,
 0xEB20,0xEB00,0xEAE0,0xEAC0,0xEAA0,0xEA80,0xEA60,0xEA40,0xF220,0xF200,0xF1E0,0xF1C0,0xF1A0,0xF180,0xF160,0xF140,0xF100,0xF0E0,0xF0C0,0xF0A0,
-0xF080,0xF060,0xF040,0xF020,0xF800 
+0xF080,0xF060,0xF040,0xF020,0xF800
+//}; 
 ,0xF841,0xF8A2,0xF8E3,0xF945,0xF986,0xF9E7,0xFA28,0xFA8A,0xFACB,0xFB2C,0xFB6D,0xFBCF,0xFC10,0xFC71,0xFCB2,0xFD14,0xFD55,0xFDB6,0xFDF7,0xFD59
 ,0xFE9A,0xFEFB,0xFF3C,0xFF9E};
 //this is used to determine size of our color map
@@ -357,11 +358,6 @@ void setup() {
 	pinMode(SCAN_LED_PIN_3, OUTPUT);
 	pinMode(SCAN_LED_PIN_4, OUTPUT);
 	
-	pinMode(PIN_SCROLL_BASE, OUTPUT);
-	//analog write values can go from 0 to 255. analogRead can go from 0 to 1023
-	analogWrite(PIN_SCROLL_BASE, 255);
-	pinMode(PIN_SCROLL_INPUT, INPUT);
-	
 	//set output for board non-neopixel LEDs
 	pinMode(LED_RED, OUTPUT);
 	pinMode(LED_BLUE, OUTPUT);
@@ -382,7 +378,12 @@ void setup() {
 	digitalWrite(BUTTON_1_PIN, HIGH);
 	digitalWrite(BUTTON_2_PIN, HIGH);
 	digitalWrite(BUTTON_3_PIN, HIGH);
+	//analog write values can go from 0 to 255. analogRead can go from 0 to 1023
+	
 	delay(10);
+
+		
+	pinMode(PIN_SCROLL_INPUT, INPUT);
 	
 	pinMode(BUTTON_1_PIN, INPUT);
 	pinMode(BUTTON_2_PIN, INPUT);
@@ -428,7 +429,7 @@ void setup() {
 	
 	//to-do: set min/max thermal camera range as +- based on ambient temperature reading?
 	SetThermalClock();
-	uint16_t oCameraParams[832];
+	uint16_t oCameraParams[834];
 	int nStatus = -1;
 	
 	nStatus = MLX90640_DumpEE(mbCameraAddress, oCameraParams);
@@ -437,7 +438,7 @@ void setup() {
 		mbThermalCameraStarted = true;
 		nStatus = MLX90640_ExtractParameters(oCameraParams, &moCameraParams);
 		//start at 1hz
-		MLX90640_SetRefreshRate(mbCameraAddress, 0x02);
+		MLX90640_SetRefreshRate(mbCameraAddress, 0x01);
 		//oThermalCamera.setMode(MLX90640_CHESS);
 		//oThermalCamera.setResolution(MLX90640_ADC_16BIT);
 		//minimize refresh rate since we can't turn off the camera? 
@@ -469,7 +470,8 @@ void setup() {
 		
 	oButton7.begin();
 	oButton7.onPressed(ToggleThermal);
-		
+	//10k potentiometer / scroller should be limited to a readable range of 10-890
+	analogReadResolution(10);
 	GoHome();
 }
 
@@ -478,10 +480,11 @@ void loop() {
 	//check this first in the loop, as everything else depends on it
 	//magnet from speaker throws z = ~ -14000, no magnets has z idle at ~ -500
 	//use z > 5000 ?
-	if (millis() - mnLastMagnetCheck >= mnMagnetInterval) {		
-		if (!mbSleepMode && oMagneto.z >= 5000) {
+	if ((millis() - mnLastMagnetCheck) > mnMagnetInterval) {
+		oMagneto.read();
+		if (!mbSleepMode && oMagneto.z < -700) {
 			SleepMode();
-		} else if (mbSleepMode && oMagneto.z < 5000) {
+		} else if (mbSleepMode && oMagneto.z > -700) {
 			ActiveMode();
 		}
 		mnLastMagnetCheck = millis();
@@ -606,7 +609,33 @@ void RunNeoPixelColor(int nPin) {
 			//pin range is 0-1023, so use value mod 128 to divide into 8 sections?  need tests on actual raw values received
 			uint16_t nScrollerValue = analogRead(PIN_SCROLL_INPUT);
 			//drawParamText(250, 75, (String)nScrollerValue, color_MAINTEXT);
-			ledPwrStrip.setPixelColor(1, mnIDLEDColorscape[nScrollerValue % 128]);
+			//ledPwrStrip.setPixelColor(1, 128,0,0);
+			uint16_t nTempColor = nScrollerValue;
+			if (nScrollerValue < 110) {
+				nTempColor = 0;
+			} else if (nScrollerValue < 220) {
+				nTempColor = 1;
+			} else if (nScrollerValue < 330) {
+				nTempColor = 2;
+			} else if (nScrollerValue < 440) {
+				nTempColor = 3;
+			} else if (nScrollerValue < 550) {
+				nTempColor = 4;
+			} else if (nScrollerValue < 660) {
+				nTempColor = 5;
+			} else if (nScrollerValue < 770) {
+				nTempColor = 6;
+			} else {
+				nTempColor = 7;
+			}
+			//nTempColor = map(nTempColor, 10, 890, 0, 7);
+			
+			int nRed = ((((mnIDLEDColorscape[nTempColor] >> 11) & 0x1F) * 527) + 23) >> 6;
+			int nGreen = ((((mnIDLEDColorscape[nTempColor] >> 5) & 0x3F) * 259) + 33) >> 6;
+			int nBlue = (((mnIDLEDColorscape[nTempColor] & 0x1F) * 527) + 23) >> 6;
+			ledPwrStrip.setPixelColor(1, nRed, nGreen, nBlue);
+			
+			ledPwrStrip.show();
 			mnLastUpdateIDLED = lTimer;
 		}
 		
@@ -886,31 +915,25 @@ void RunHome() {
 			nDisplaySeconds = nUptimeSeconds - (nUptimeMinutes * 60);
 		}
 		
-		String sUptime =  (nUptimeHours > 9 ? String(nUptimeHours) : "0" + String(nUptimeHours) ) + ":" + (nDisplayMinutes > 9 ? String(nDisplayMinutes) : "0" + String(nDisplayMinutes)) + "." + (nDisplaySeconds > 9 ? String(nDisplaySeconds) : "0" + String(nDisplaySeconds));
+		String sUptime = (nUptimeHours > 9 ? String(nUptimeHours) : "0" + String(nUptimeHours) ) + ":" + (nDisplayMinutes > 9 ? String(nDisplayMinutes) : "0" + String(nDisplayMinutes)) + "." + (nDisplaySeconds > 9 ? String(nDisplaySeconds) : "0" + String(nDisplaySeconds));
 		tft.fillRect(180, 58, 58, 25, ST77XX_BLACK);
 		drawParamText(185, 75, sUptime, color_MAINTEXT);
 		
 		//tft.fillRect(250,60, 40, 20, ST77XX_BLACK);
 		//drawParamText(250,75, (String)TWI_CLOCK, color_MAINTEXT);
 		
-		//if (mbMagnetometer && millis() - mnLastMagnetCheck >= mnMagnetInterval) {
-		//	oMagneto.read();
-			//output raw data to screen - test this with magnet behind 4mm of PLA ~
-			//drawParamText(250, 25, (String)oMagneto.x, color_MAINTEXT);
-			//drawParamText(250, 50, (String)oMagneto.y, color_MAINTEXT);
-		//	tft.fillRect(250, 60, 40, 20, ST77XX_BLACK);
-		//	drawParamText(250, 75, (String)oMagneto.z, color_MAINTEXT);
-		//	mnLastMagnetCheck = millis();
-		//}
-		
-		//show potentiometer data on home screen
-		uint16_t nScrollerValue = analogRead(PIN_SCROLL_INPUT);
-		drawParamText(250, 75, (String)nScrollerValue, color_MAINTEXT);
-		
-		
-		
 		mnLastUpdateHome = millis();
 	}
+	/*
+	if (mbMagnetometer && (millis() - mnLastMagnetCheck) > mnMagnetInterval) {
+		oMagneto.read();
+		//output raw data to screen - test this with magnet behind 4mm of PLA ~
+		//drawParamText(250, 25, (String)oMagneto.x, color_MAINTEXT);
+		//drawParamText(250, 50, (String)oMagneto.y, color_MAINTEXT);
+		tft.fillRect(250, 60, 40, 20, ST77XX_BLACK);
+		drawParamText(250, 75, (String)oMagneto.z, color_MAINTEXT);
+		mnLastMagnetCheck = millis();
+	}*/
 }
 
 void ResetWireClock() {
@@ -1663,7 +1686,7 @@ void RunThermal() {
 	if (!mbButton7Flag) return;	
 	
 	if (!mbThermalCameraStarted) {
-		tft.fillRect(0, 0, 30, 30, ST77XX_BLACK);
+		tft.fillRect(150, 80, 70, 40, ST77XX_BLACK);
 		drawParamText(150, 100, "THERMALOPTICS OFFLINE", color_HEADER);
 		//set value for screen blanked so this doesn't constantly get redrawn
 		return;
@@ -1672,13 +1695,19 @@ void RunThermal() {
 	//pimoroni camera "bottom" of view is section with pin holes
 	//use 30fps cap to restrict how often it tries to pull camera data, or this will block button press polling
 	//need 2 data frames for each displayed frame, as it only pulls half the range at a time.
-	if (millis() - mnLastCameraFrame >= mnThermalCameraInterval) {
-
+	if ((millis() - mnLastCameraFrame) > mnThermalCameraInterval) {
+		//tft.fillRect(20, 0, 120, 20, ST77XX_BLACK);
+		//drawParamText(20, 20, "THERM OK", color_HEADER);
+		
 		//iterate through full frame capture, then do 1 draw with all values
 		for (byte i = 0; i < 2; i++) {
 			uint16_t arrTempFrameRaw[834];
 			int nStatus = MLX90640_GetFrameData(mbCameraAddress, arrTempFrameRaw);
-			if (nStatus != 0) return;
+			//if (nStatus != 0) {
+				//tft.fillRect(50, 0, 70, 20, ST77XX_BLUE);
+				//return;
+				//continue;
+			//}
 			
 			if (mfTR == 0.0) {
 				//mfVdd = MLX90640_GetVdd
@@ -1690,19 +1719,19 @@ void RunThermal() {
 		
 		for (uint8_t nRow = 0; nRow < 24; nRow++) {
 			for (uint8_t nCol = 0; nCol < 32; nCol++) {		
-				int fTemp = mfarrTempFrame[nRow*32 + nCol];
+				float fTemp = mfarrTempFrame[nRow*32 + nCol];
 				
 				//clip temperature readings to defined range for color mapping
 				//may want to increase color fidelity to accomodate larger range?
-				//fTemp = min(fTemp, MAX_CAMERA_TEMP);
-				//fTemp = max(fTemp, MIN_CAMERA_TEMP); 
-				//if ((nRow == 0 || nRow == 12 || nRow == 18) && (nCol == 0 || nCol == 16 || nCol == 28)) {
-				//	tft.fillRect(nCol*8, nRow*7, 24, 16, ST77XX_BLUE);
-				//	drawParamText(nCol * 8, nRow * 8, (String)fTemp, ST77XX_WHITE);
+				fTemp = min(fTemp, MAX_CAMERA_TEMP);
+				fTemp = max(fTemp, MIN_CAMERA_TEMP); 
+				//if (nRow == 0 && nCol == 0) {
+				//	tft.fillRect(50, 50, 24, 16, ST77XX_BLUE);
+				//	drawParamText(50, 70, (String)mfarrTempFrame[0], ST77XX_WHITE);
 				//}
 				//mnarrThermalDisplayColors
-				uint8_t nColorIndex = map(fTemp, MIN_CAMERA_TEMP, MAX_CAMERA_TEMP, 0, mnColorArraySize);
-				nColorIndex = constrain(nColorIndex, 0, mnColorArraySize);
+				uint8_t nColorIndex = map(fTemp, 20, 35, 0, 280);
+				nColorIndex = constrain(nColorIndex, 0, 280);
 				
 				//draw the pixels
 				tft.fillRect((mnThermalPixelWidth * nCol) + mnCameraDisplayStartX, (mnThermalPixelHeight * nRow) + mnCameraDisplayStartY, mnThermalPixelWidth, mnThermalPixelHeight, mnarrThermalDisplayColors[nColorIndex]);
