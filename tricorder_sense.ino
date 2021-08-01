@@ -143,6 +143,10 @@ int mnBoardColor = 4;
 int mnPowerLEDInterval = 30000;
 int mnIDLEDInterval = 1000;
 unsigned long mnLastUpdateIDLED = 0;
+int mnCurrentProfileRed = 0;
+int mnCurrentProfileGreen = 0;
+int mnCurrentProfileBlue = 0;
+String msCurrentProfileName = "";
 int mnEMRGLEDInterval = 110;
 int mnEMRGMinStrength = 8;
 int mnEMRGMaxStrength = 212;
@@ -167,6 +171,7 @@ bool mbBoardRedLED = false;
 bool mbBoardBlueLED = false;
 //colors range is purple > blue > green > yellow > orange > red > pink > white
 const uint32_t mnIDLEDColorscape[] = {0x8010,0x0010,0x0400,0x5C60,0x8300,0x8000,0x8208,0x8410};
+const String marrProfiles[] = {"ALPHA","BETA","GAMMA","DELTA","EPSILON","ZETA","ETA","THETA"};
 
 //color sensor
 bool mbColorInitialized = false;
@@ -319,8 +324,6 @@ const uint16_t mnarrThermalDisplayColors[] = {0x480F, 0x400F,0x400F,0x400F,0x401
 //}; 
 ,0xF841,0xF8A2,0xF8E3,0xF945,0xF986,0xF9E7,0xFA28,0xFA8A,0xFACB,0xFB2C,0xFB6D,0xFBCF,0xFC10,0xFC71,0xFCB2,0xFD14,0xFD55,0xFDB6,0xFDF7,0xFD59
 ,0xFE9A,0xFEFB,0xFF3C,0xFF9E};
-//this is used to determine size of our color map
-uint8_t mnColorArraySize = sizeof(mnarrThermalDisplayColors) / sizeof(uint16_t);
 
 //to-do:
 //left side led stacking mode for countdown to color scanner action
@@ -592,11 +595,6 @@ void RunNeoPixelColor(int nPin) {
 				}
 								
 			}
-			//if (!mbLEDIDSet) {
-				//ledPwrStrip.setPixelColor(1, 90, 140, 0);
-				//mbLEDIDSet = true;
-				////ledPwrStrip.setPixelColor(2, 128, 0, 0);
-			//}
 						
 			mnLastUpdatePower = lTimer;
 			//ledPwrStrip.show();
@@ -606,10 +604,8 @@ void RunNeoPixelColor(int nPin) {
 		if (mnLastUpdateIDLED == 0 || ((lTimer - mnLastUpdateIDLED) > mnIDLEDInterval)) {
 			//set ID LED color based on value pulled from A1, edge prong of scroll potentiometer
 			//colors range is purple > blue > green > yellow > orange > red > pink > white
-			//pin range is 0-1023, so use value mod 128 to divide into 8 sections?  need tests on actual raw values received
+			//pin range is ~10-890 when ADC is 8 bit resolution.  ADC resolution will ALSO affect magnetometer readings.
 			uint16_t nScrollerValue = analogRead(PIN_SCROLL_INPUT);
-			//drawParamText(250, 75, (String)nScrollerValue, color_MAINTEXT);
-			//ledPwrStrip.setPixelColor(1, 128,0,0);
 			uint16_t nTempColor = nScrollerValue;
 			if (nScrollerValue < 110) {
 				nTempColor = 0;
@@ -628,12 +624,13 @@ void RunNeoPixelColor(int nPin) {
 			} else {
 				nTempColor = 7;
 			}
-			//nTempColor = map(nTempColor, 10, 890, 0, 7);
+			msCurrentProfileName = marrProfiles[nTempColor];
 			
-			int nRed = ((((mnIDLEDColorscape[nTempColor] >> 11) & 0x1F) * 527) + 23) >> 6;
-			int nGreen = ((((mnIDLEDColorscape[nTempColor] >> 5) & 0x3F) * 259) + 33) >> 6;
-			int nBlue = (((mnIDLEDColorscape[nTempColor] & 0x1F) * 527) + 23) >> 6;
-			ledPwrStrip.setPixelColor(1, nRed, nGreen, nBlue);
+			//calling uint16 parameter function for set color was not working. converting uint16 to rgb
+			mnCurrentProfileRed = ((((mnIDLEDColorscape[nTempColor] >> 11) & 0x1F) * 527) + 23) >> 6;
+			mnCurrentProfileGreen = ((((mnIDLEDColorscape[nTempColor] >> 5) & 0x3F) * 259) + 33) >> 6;
+			mnCurrentProfileRedBlue = (((mnIDLEDColorscape[nTempColor] & 0x1F) * 527) + 23) >> 6;
+			ledPwrStrip.setPixelColor(1, mnCurrentProfileRed, mnCurrentProfileGreen, mnCurrentProfileRedBlue);
 			
 			ledPwrStrip.show();
 			mnLastUpdateIDLED = lTimer;
@@ -786,8 +783,15 @@ void GoHome() {
 	tft.fillRoundRect(1, 1, 68, 66, 32, color_SWOOP);
 	tft.fillRoundRect(1, 171, 68, 66, 32, color_SWOOP);
 	tft.fillRoundRect(59, 23, 24, 193, 11, ST77XX_BLACK);
-	//middle section
-	tft.fillRect(1, 39, 58, 164, color_HEADER);
+	//middle section - needs to be split for profile name and color
+	//tft.fillRect(1, 39, 58, 164, color_HEADER);
+	tft.fillRect(1, 39, 58, 76, RGBto565((int)(mnCurrentProfileRed / 2), (int)(mnCurrentProfileGreen / 2), (int)(mnCurrentProfileBlue)));
+	tft.fillRect(1, 147, 58, 55, RGBto565((int)(mnCurrentProfileRed / 2), (int)(mnCurrentProfileGreen / 2), (int)(mnCurrentProfileBlue)));
+	//profile label always shows bkg as header color
+	tft.fillRect(1, 119, 58, 24, color_HEADER);
+	drawParamText(6, 138, msCurrentProfileName, ST77XX_BLACK);
+	
+	
 	//middle section black lines
 	tft.drawFastHLine(1, 35, 58, ST77XX_BLACK);
 	tft.drawFastHLine(1, 36, 58, ST77XX_BLACK);
@@ -919,11 +923,16 @@ void RunHome() {
 		tft.fillRect(180, 58, 58, 25, ST77XX_BLACK);
 		drawParamText(185, 75, sUptime, color_MAINTEXT);
 		
-		//tft.fillRect(250,60, 40, 20, ST77XX_BLACK);
-		//drawParamText(250,75, (String)TWI_CLOCK, color_MAINTEXT);
+		//show profile color and name in left frame border
+		tft.fillRect(1, 39, 58, 76, RGBto565((int)(mnCurrentProfileRed / 2), (int)(mnCurrentProfileGreen / 2), (int)(mnCurrentProfileBlue)));
+		tft.fillRect(1, 147, 58, 55, RGBto565((int)(mnCurrentProfileRed / 2), (int)(mnCurrentProfileGreen / 2), (int)(mnCurrentProfileBlue)));
+		//profile label always shows bkg as header color
+		tft.fillRect(1, 119, 58, 24, color_HEADER);
+		drawParamText(6, 138, msCurrentProfileName, ST77XX_BLACK);
 		
 		mnLastUpdateHome = millis();
 	}
+	//raw data output to home screen for debug
 	/*
 	if (mbMagnetometer && (millis() - mnLastMagnetCheck) > mnMagnetInterval) {
 		oMagneto.read();
@@ -1703,18 +1712,13 @@ void RunThermal() {
 		for (byte i = 0; i < 2; i++) {
 			uint16_t arrTempFrameRaw[834];
 			int nStatus = MLX90640_GetFrameData(mbCameraAddress, arrTempFrameRaw);
-			//if (nStatus != 0) {
-				//tft.fillRect(50, 0, 70, 20, ST77XX_BLUE);
-				//return;
-				//continue;
-			//}
 			
 			if (mfTR == 0.0) {
 				//mfVdd = MLX90640_GetVdd
 				mfTA = MLX90640_GetTa(arrTempFrameRaw, &moCameraParams);
 				mfTR = mfTA - TA_SHIFT;		
 			}
-			MLX90640_CalculateTo(arrTempFrameRaw, &moCameraParams, mfCameraEmissivity, 0.0, mfarrTempFrame);		
+			MLX90640_CalculateTo(arrTempFrameRaw, &moCameraParams, mfCameraEmissivity, mfTR, mfarrTempFrame);		
 		}
 		
 		for (uint8_t nRow = 0; nRow < 24; nRow++) {
