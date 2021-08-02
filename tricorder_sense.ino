@@ -14,7 +14,6 @@
 #include <MLX90640_API.h>
 #include <MLX90640_I2C_Driver.h>
 #include <Adafruit_LIS3MDL.h>	//magnetometer, for door close detection
-//#include <SPIMemory.h>
 
 //full arduino pinout for this board is here:
 /*https://github.com/adafruit/Adafruit_nRF52_Arduino/blob/master/variants/feather_nrf52840_sense/variant.h*/
@@ -31,38 +30,29 @@
 #define TFT_CS 						6
 // SD card select pin
 //#define SD_CS 			11 	//- can't use pin 4 as that is for blue connection led
-#define TFT_RST 						-1
+#define TFT_RST 					-1
 #define TFT_DC 						5
-#define USE_SD_CARD 			0
+#define USE_SD_CARD 				0
 
 //pin 9 is free, as pin_a6 is for vbat and is otherwise known as digital 20
 #define VOLT_PIN 					PIN_A6		//INPUT_POWER_PIN
-#define SOUND_TRIGGER_PIN	9
+#define SOUND_TRIGGER_PIN			9
 
-//buttons, scroller	- d2 pin actually pin #2
-//we can't use pin 13 for buttons, as that is connected directly to a red LED on the board.
+//buttons, scroller	- d2 pin supposed to be pin #2
 //button on the board is connected to pin 7.  TX is pin 0, RX is pin 1 - these are normally used for serial communication
-//you can't use 13 as an input, but it can be an output for maybe a single LED?
-
-//#define PIN_D2						PIN_NFC1
-//#define BUTTON_1_PIN		PIN_AREF
-//#define BUTTON_2_PIN		PIN_A4
-//#define BUTTON_3_PIN		PIN_A5
+//#define PIN_D2						PIN_NFC2
 
 #define BUTTON_1_PIN				PIN_SERIAL1_RX
 #define BUTTON_2_PIN				PIN_SERIAL1_TX
-#define BUTTON_3_PIN				11
+//adafruit defines pin D2 as pin 2 in its header file, but it does not respond when set as an input
+//per the datasheet, NFC2 may actually be pin 54 or J24 ??? maybe this will work after restoring bootloader to default via double tap on reset button
+#define BUTTON_3_PIN				(2)
 
 //pin 7 is the board button
 #define BUTTON_BOARD				PIN_BUTTON1
-
+//only need 1 pin for potentiometer / scroller input. both poles need to be wired to GND and 3v - order doesn't matter
 #define PIN_SCROLL_INPUT			PIN_A0
 
-// A0 is pin14. can't use that as an output pin?		A0 = 14, A3 = 17
-//#define SCAN_LED_PIN_1 	PIN_A0	//14
-//#define SCAN_LED_PIN_2 	PIN_A1	//15
-//#define SCAN_LED_PIN_3 	PIN_A2	//16
-//#define SCAN_LED_PIN_4 	PIN_A3	//17
 #define SCAN_LED_PIN_1 			PIN_A2
 #define SCAN_LED_PIN_2 			PIN_A3
 #define SCAN_LED_PIN_3 			PIN_A4
@@ -71,9 +61,9 @@
 #define SCAN_LED_BRIGHTNESS 	32
 
 //neopixel power LED. must use an unreserved pin for this.  PWR, ID, EMRG all use this pin
-#define POWER_LED_PIN 					10
+#define POWER_LED_PIN 				10
 #define NEOPIXEL_BRIGHTNESS 		64
-#define NEOPIXEL_LED_COUNT 		3
+#define NEOPIXEL_LED_COUNT 			3
 // built-in pins: D4 = blue conn LED, 8 = neopixel on board, D13 = red LED next to micro usb port
 //#define NEOPIXEL_BOARD_LED_PIN	8
 //#define PIN_NEOPIXEL 8
@@ -85,23 +75,23 @@
 //#define PIN_SERIAL1_TX       (0)
 
 //system os version #. max 3 digits
-#define DEVICE_VERSION			"0.86"
+#define DEVICE_VERSION			"0.87"
 
 // TNG colors here
 #define color_SWOOP				0xF7B3
 #define color_MAINTEXT			0x9E7F
 //#define color_MAINTEXT			0xC69F
-#define color_LABELTEXT		0x841E
-#define color_HEADER				0xFEC8
+#define color_LABELTEXT			0x841E
+#define color_HEADER			0xFEC8
 #define color_TITLETEXT			0xFEC8
 //196,187,145
 #define color_LABELTEXT2		0xC5D2
 //204,174,220
 #define color_LABELTEXT3		0xCD7B
 #define color_LABELTEXT4		0xEE31
-#define color_LEGEND				0x6A62
+#define color_LEGEND			0x6A62
 //210,202,157
-#define color_FFT					0xDEB5
+#define color_FFT				0xDEB5
 
 // ds9
 //#define color_SWOOP			0xD4F0
@@ -172,6 +162,7 @@ bool mbBoardBlueLED = false;
 //colors range is purple > blue > green > yellow > orange > red > pink > white
 const uint32_t mnIDLEDColorscape[] = {0x8010,0x0010,0x0400,0x5C60,0x8300,0x8000,0x8208,0x8410};
 const String marrProfiles[] = {"ALPHA","BETA","GAMMA","DELTA","EPSILON","ZETA","ETA","THETA"};
+const uint16_t mnThermalCameraLabels[] = {0xD6BA,0xC0A3,0xD541,0xD660,0x9E02,0x0458,0x89F1};
 
 //color sensor
 bool mbColorInitialized = false;
@@ -327,27 +318,19 @@ const uint16_t mnarrThermalDisplayColors[] = {0x480F, 0x400F,0x400F,0x400F,0x401
 
 //to-do:
 //left side led stacking mode for countdown to color scanner action
-//rearrange pin functions to leverage analog input for potentiometer
-//map ID led color to potentiometer
-//	top edge of rotation -> all WHITE
-//	rest of colors cycle through color spectrum blue > green > yellow > orange > red > pink > purple
-//refactor home screen to report status of thermal camera connection
-//to-do: have device broadcast for bluetooth connectivity, allow selection of preferred "THEME"
-//between ds9, voyager, tng
+//tom servo screen creation with canned animation using trigger mapped to met / bio buttons pressed simultaneously
 
 void setup() {
 	ledPwrStrip.begin();
 	ledBoard.begin();
 	
-	// OR use this initializer (uncomment) if using a 2.0" 320x240 TFT. technically this is a rotated 240x320, so declaration is in that order
+	// use this initializer for a 2.0" 320x240 TFT. technically this is a rotated 240x320, so declaration is in that order
 	tft.init(240, 320, SPI_MODE0); // Init ST7789 320x240
 	tft.setRotation(1);
 	tft.setFont(&lcars11pt7b);
 	//these goggles, they do nothing!
 	tft.setTextWrap(false);
-	
-	//Serial.begin(9600);
-	
+		
 	ledPwrStrip.clear();
 	ledBoard.clear();
 	// max brightness is 255
@@ -367,13 +350,7 @@ void setup() {
 	
 	pinMode(SOUND_TRIGGER_PIN, OUTPUT);
 	digitalWrite(SOUND_TRIGGER_PIN, HIGH);
-	
-	//this will be used to "turn off" the display via reed switch when the door is closed - this is just pulling backlight to ground.
-	//pinMode(SLEEP_PIN, OUTPUT);
-	//this will also cause the red LED on the board to ALWAYS be on, so you know if sleep is activated while door closed.
-	//digitalWrite(SLEEP_PIN, HIGH);
-	
-	//AREF pin is an analog reference and set low by default. need to write high to this to initialize it
+		
 	//or it'll be read as low and boot the tricorder into environment section
 	pinMode(BUTTON_1_PIN, OUTPUT);
 	pinMode(BUTTON_2_PIN, OUTPUT);
@@ -381,10 +358,8 @@ void setup() {
 	digitalWrite(BUTTON_1_PIN, HIGH);
 	digitalWrite(BUTTON_2_PIN, HIGH);
 	digitalWrite(BUTTON_3_PIN, HIGH);
-	//analog write values can go from 0 to 255. analogRead can go from 0 to 1023
-	
+		
 	delay(10);
-
 		
 	pinMode(PIN_SCROLL_INPUT, INPUT);
 	
@@ -430,7 +405,6 @@ void setup() {
 	
 	mbMagnetometer = oMagneto.begin_I2C();
 	
-	//to-do: set min/max thermal camera range as +- based on ambient temperature reading?
 	SetThermalClock();
 	uint16_t oCameraParams[834];
 	int nStatus = -1;
@@ -474,6 +448,7 @@ void setup() {
 	oButton7.begin();
 	oButton7.onPressed(ToggleThermal);
 	//10k potentiometer / scroller should be limited to a readable range of 10-890
+	//analog write values can go from 0 to 255. analogRead can go from 0 to 2^(analogReadResolution)
 	analogReadResolution(10);
 	GoHome();
 }
@@ -481,8 +456,9 @@ void setup() {
 void loop() {
 	//if magnet read in Z direction is over a threshold, trigger sleep.
 	//check this first in the loop, as everything else depends on it
-	//magnet from speaker throws z = ~ -14000, no magnets has z idle at ~ -500
+	//magnet from speaker throws z = ~ +14000, no magnets has z idle at ~ -500
 	//use z > 5000 ?
+	//need tests with speaker above and door magnet below - may require testing within assembled shell
 	if ((millis() - mnLastMagnetCheck) > mnMagnetInterval) {
 		oMagneto.read();
 		if (!mbSleepMode && oMagneto.z < -700) {
@@ -728,17 +704,27 @@ void DisableFlash() {
 void RunLeftScanner() {
 	unsigned long lTimer = millis();
 	
-	//to-do: when color scanner running, use left side lights to convey scan coming soon:
-	
-	if ((lTimer - mnLastUpdateLeftLED) > mnLeftLEDInterval) {		
-		//add switch or if/else for different scanner modes
-		switch (mnLeftLEDCurrent) {
-			case 1: analogWrite(SCAN_LED_PIN_1, 0); analogWrite(SCAN_LED_PIN_4, SCAN_LED_BRIGHTNESS); mnLeftLEDCurrent = 4; break;
-			case 2: analogWrite(SCAN_LED_PIN_2, 0); analogWrite(SCAN_LED_PIN_1, SCAN_LED_BRIGHTNESS); mnLeftLEDCurrent = 1; break;
-			case 3: analogWrite(SCAN_LED_PIN_3, 0); analogWrite(SCAN_LED_PIN_2, SCAN_LED_BRIGHTNESS); mnLeftLEDCurrent = 2; break;
-			default: analogWrite(SCAN_LED_PIN_4, 0); analogWrite(SCAN_LED_PIN_3, SCAN_LED_BRIGHTNESS); mnLeftLEDCurrent = 3; break;
+	//when color scanner running, use left side lights to convey scan coming soon:
+	if (!mbRGBActive) {
+		if ((lTimer - mnLastUpdateLeftLED) > mnLeftLEDInterval) {		
+			//add switch or if/else for different scanner modes
+			switch (mnLeftLEDCurrent) {
+				case 1: analogWrite(SCAN_LED_PIN_1, 0); analogWrite(SCAN_LED_PIN_4, SCAN_LED_BRIGHTNESS); mnLeftLEDCurrent = 4; break;
+				case 2: analogWrite(SCAN_LED_PIN_2, 0); analogWrite(SCAN_LED_PIN_1, SCAN_LED_BRIGHTNESS); mnLeftLEDCurrent = 1; break;
+				case 3: analogWrite(SCAN_LED_PIN_3, 0); analogWrite(SCAN_LED_PIN_2, SCAN_LED_BRIGHTNESS); mnLeftLEDCurrent = 2; break;
+				default: analogWrite(SCAN_LED_PIN_4, 0); analogWrite(SCAN_LED_PIN_3, SCAN_LED_BRIGHTNESS); mnLeftLEDCurrent = 3; break;
+			}
+			mnLastUpdateLeftLED = lTimer;		
 		}
-		mnLastUpdateLeftLED = lTimer;		
+	} else {
+		//currently stacks "downward" - all on to only alpha on - which is more like an opening drape
+		switch (mnRGBCooldown) {
+			case 1: analogWrite(SCAN_LED_PIN_1, SCAN_LED_BRIGHTNESS); analogWrite(SCAN_LED_PIN_2, 0); analogWrite(SCAN_LED_PIN_3, 0); analogWrite(SCAN_LED_PIN_4, 0); break;
+			case 2: analogWrite(SCAN_LED_PIN_1, SCAN_LED_BRIGHTNESS); analogWrite(SCAN_LED_PIN_2, SCAN_LED_BRIGHTNESS); analogWrite(SCAN_LED_PIN_3, 0); analogWrite(SCAN_LED_PIN_4, 0); break;
+			case 3: analogWrite(SCAN_LED_PIN_1, SCAN_LED_BRIGHTNESS); analogWrite(SCAN_LED_PIN_2, SCAN_LED_BRIGHTNESS); analogWrite(SCAN_LED_PIN_3, SCAN_LED_BRIGHTNESS); analogWrite(SCAN_LED_PIN_4, 0); break;
+			case 4: analogWrite(SCAN_LED_PIN_1, SCAN_LED_BRIGHTNESS); analogWrite(SCAN_LED_PIN_2, SCAN_LED_BRIGHTNESS); analogWrite(SCAN_LED_PIN_3, SCAN_LED_BRIGHTNESS); analogWrite(SCAN_LED_PIN_4, SCAN_LED_BRIGHTNESS); break;
+			default: analogWrite(SCAN_LED_PIN_1, 0); analogWrite(SCAN_LED_PIN_2, 0); analogWrite(SCAN_LED_PIN_3, 0); analogWrite(SCAN_LED_PIN_4, 0); break;
+		}
 	}
 }
 
@@ -785,9 +771,10 @@ void GoHome() {
 	tft.fillRoundRect(59, 23, 24, 193, 11, ST77XX_BLACK);
 	//middle section - needs to be split for profile name and color
 	//tft.fillRect(1, 39, 58, 164, color_HEADER);
-	tft.fillRect(1, 39, 58, 76, RGBto565((int)(mnCurrentProfileRed / 2), (int)(mnCurrentProfileGreen / 2), (int)(mnCurrentProfileBlue)));
-	tft.fillRect(1, 147, 58, 55, RGBto565((int)(mnCurrentProfileRed / 2), (int)(mnCurrentProfileGreen / 2), (int)(mnCurrentProfileBlue)));
-	//profile label always shows bkg as header color
+	//dull all LED colors by 50% to lcarsify them
+	tft.fillRect(1, 39, 58, 76, RGBto565((int)(mnCurrentProfileRed / 2), (int)(mnCurrentProfileGreen / 2), (int)(mnCurrentProfileBlue / 2)));
+	tft.fillRect(1, 147, 58, 55, RGBto565((int)(mnCurrentProfileRed / 2), (int)(mnCurrentProfileGreen / 2), (int)(mnCurrentProfileBlue / 2)));
+	//profile label always shows bkg as header color - this is a notification
 	tft.fillRect(1, 119, 58, 24, color_HEADER);
 	drawParamText(6, 138, msCurrentProfileName, ST77XX_BLACK);
 	
@@ -842,56 +829,88 @@ void GoHome() {
 	drawParamText(204, 100, String((float) F_CPU / 1023000.0), color_MAINTEXT);
 	//device version
 	drawParamText(235, 100, "           " + String(DEVICE_VERSION), color_MAINTEXT);
-	
-	//may need refactor if thermal camera is viable, to show 4 statuses instead of 3
-	
+		
 	//color_LABELTEXT2 brown, labeltext3 pinkish, labeltext4 is tan/orange
 	//show sensor statuses		
 	//environment = temperature, humidity sensors
+	//119x34, 7 pixels between rectangle and cap
+	//82x34 if no cap
 	if (mbTempInitialized) {
-		tft.fillRect(76, 119, 139, 24, color_LABELTEXT4);
-		//actual status tab
-		tft.fillRoundRect(279, 119, 24, 24, 11, color_LABELTEXT4);
-		tft.fillRect(230, 119, 65, 24, color_LABELTEXT4);
-		drawParamText(239, 138, mbHumidityInitialized ? "ONLINE" : "PARTIAL", ST77XX_BLACK);
+		//tft.fillRect(76, 119, 139, 24, color_LABELTEXT4);
+		////actual status tab
+		//tft.fillRoundRect(279, 119, 24, 24, 11, color_LABELTEXT4);
+		//tft.fillRect(230, 119, 65, 24, color_LABELTEXT4);
+		//drawParamText(239, 138, mbHumidityInitialized ? "ONLINE" : "PARTIAL", ST77XX_BLACK);
+		tft.fillRoundRect(70, 119, 119, 34, 17, (mbHumidityInitialized ? color_LABELTEXT4 : color_LABELTEXT3));
+		tft.fillRect(70, 119, 18, 34, (mbHumidityInitialized ? color_LABELTEXT4 : color_LABELTEXT3));		
 	} else if (mbHumidityInitialized) {
-		tft.fillRect(76, 119, 139, 24, color_LABELTEXT3);
-		//actual status tab
-		tft.fillRoundRect(279, 150, 24, 24, 11, color_LABELTEXT3);
-		tft.fillRect(230, 119, 65, 24, color_LABELTEXT3);
-		drawParamText(239, 138, "PARTIAL", ST77XX_BLACK);
+		//tft.fillRect(76, 119, 139, 24, color_LABELTEXT3);
+		////actual status tab
+		//tft.fillRoundRect(279, 150, 24, 24, 11, color_LABELTEXT3);
+		//tft.fillRect(230, 119, 65, 24, color_LABELTEXT3);
+		//drawParamText(239, 138, "PARTIAL", ST77XX_BLACK);
+		tft.fillRoundRect(70, 119, 119, 34, 17, color_LABELTEXT3);
+		tft.fillRect(70, 119, 18, 34, color_LABELTEXT3);
 	} else {
-		tft.fillRect(76, 119, 139, 24, color_LABELTEXT2);
-		//drawParamText(95, 84, "OFFLINE", color_REDDATATEXT);
+		//offline, show no round cap
+		//tft.fillRect(76, 119, 139, 24, color_LABELTEXT2);
+		tft.fillRect(70, 119, 81, 34, color_LABELTEXT2);		
 	}
-	drawParamText(159, 138, "CLIMATE", ST77XX_BLACK);
+	//drawParamText(159, 138, "CLIMATE", ST77XX_BLACK);
+	drawParamText(78, 142, "CLIMATE", ST77XX_BLACK);
 	
 	if (mbColorInitialized) {
-		tft.fillRect(76, 150, 139, 24, color_LABELTEXT4);		
-		tft.fillRoundRect(279, 150, 24, 24, 11, color_LABELTEXT4);
-		tft.fillRect(230, 150, 65, 24, color_LABELTEXT4);
-		
-		drawParamText(239, 169, "ONLINE", ST77XX_BLACK);
+		//tft.fillRect(76, 150, 139, 24, color_LABELTEXT4);		
+		//tft.fillRoundRect(279, 150, 24, 24, 11, color_LABELTEXT4);
+		//tft.fillRect(230, 150, 65, 24, color_LABELTEXT4);		
+		//drawParamText(239, 169, "ONLINE", ST77XX_BLACK);
+		tft.fillRoundRect(70, 168, 119, 34, 17, color_LABELTEXT4);
+		tft.fillRect(70, 168, 18, 34, color_LABELTEXT4);
 	} else {		
-		tft.fillRect(76, 150, 139, 24, color_LABELTEXT2);
+		tft.fillRect(70, 168, 82, 34, color_LABELTEXT2);
 	}
-	drawParamText(137, 169, "CHROMATICS", ST77XX_BLACK);
+	drawParamText(78, 191, "CHROMATICS", ST77XX_BLACK);
+	//drawParamText(137, 169, "CHROMATICS", ST77XX_BLACK);
 	
 	if (mbMicrophoneStarted) {
-		tft.fillRect(76, 181, 139, 24, color_LABELTEXT4);		
-		tft.fillRoundRect(279, 181, 24, 24, 11, color_LABELTEXT4);
-		tft.fillRect(230, 181, 65, 24, color_LABELTEXT4);
-		drawParamText(239, 200, "ONLINE", ST77XX_BLACK);
+		//tft.fillRect(76, 181, 139, 24, color_LABELTEXT4);		
+		//tft.fillRoundRect(279, 181, 24, 24, 11, color_LABELTEXT4);
+		//tft.fillRect(230, 181, 65, 24, color_LABELTEXT4);
+		//drawParamText(239, 200, "ONLINE", ST77XX_BLACK);
+		tft.fillRoundRect(192, 119, 119, 34, 17, color_LABELTEXT4);
+		tft.fillRect(192, 119, 18, 34, color_LABELTEXT4);
 	} else {
-		tft.fillRect(76, 181, 139, 24, color_LABELTEXT2);
-	}
-	//drawParamText(174, 200, "AUDIO", ST77XX_BLACK);
-	drawParamText(169, 200, "SONICS", ST77XX_BLACK);
+		//tft.fillRect(76, 181, 139, 24, color_LABELTEXT2);
+		tft.fillRect(192, 119, 82, 34, color_LABELTEXT2);
+	}	
+	//drawParamText(169, 200, "SONICS", ST77XX_BLACK);
+	drawParamText(200, 142, "SONICS", ST77XX_BLACK);
 	
-	//if (mbThermalCameraStarted) {
-		//show thermal camera is OK to use
-	//}
-		
+	if (mbThermalCameraStarted) {
+		tft.fillRoundRect(192, 168, 119, 34, 17, color_LABELTEXT4);
+		tft.fillRect(192, 168, 18, 34, color_LABELTEXT4);
+	} else {
+		tft.fillRect(192, 168, 82, 34, color_LABELTEXT2);
+	}
+	drawParamText(200, 191, "THERMAL", ST77XX_BLACK);
+	
+	
+	//black lines to separate rectangles from caps
+	tft.drawFastHLine(152, 119, 84, ST77XX_BLACK);
+	tft.drawFastHLine(153, 119, 84, ST77XX_BLACK);
+	tft.drawFastHLine(154, 119, 84, ST77XX_BLACK);
+	tft.drawFastHLine(155, 119, 84, ST77XX_BLACK);
+	tft.drawFastHLine(156, 119, 84, ST77XX_BLACK);
+	tft.drawFastHLine(157, 119, 84, ST77XX_BLACK);
+	tft.drawFastHLine(158, 119, 84, ST77XX_BLACK);
+	tft.drawFastHLine(275, 119, 84, ST77XX_BLACK);
+	tft.drawFastHLine(276, 119, 84, ST77XX_BLACK);
+	tft.drawFastHLine(277, 119, 84, ST77XX_BLACK);
+	tft.drawFastHLine(278, 119, 84, ST77XX_BLACK);
+	tft.drawFastHLine(279, 119, 84, ST77XX_BLACK);
+	tft.drawFastHLine(280, 119, 84, ST77XX_BLACK);
+	tft.drawFastHLine(281, 119, 84, ST77XX_BLACK);
+			
 }
 
 void RunHome() {	
@@ -932,7 +951,7 @@ void RunHome() {
 		
 		mnLastUpdateHome = millis();
 	}
-	//raw data output to home screen for debug
+	//raw magnet data output to home screen for debug
 	/*
 	if (mbMagnetometer && (millis() - mnLastMagnetCheck) > mnMagnetInterval) {
 		oMagneto.read();
@@ -1681,7 +1700,55 @@ void ToggleThermal() {
 		MLX90640_SetRefreshRate(mbCameraAddress, 0x04);
 		ActivateSound();
 		
-		//to-do: draw border for thermal camera visualization
+		//draw border for thermal camera visualization
+		//main swoop left and right 22x30, 6x33
+		tft.fillRoundRect(6, 6, 22, 30, 11, color_SWOOP);
+		tft.fillRoundRect(6, 204, 22, 30, 11, color_SWOOP);
+				
+		tft.fillRect(6, 204, 22, 22, color_SWOOP);
+		tft.fillRect(6, 14, 12, 22, color_SWOOP);
+		
+		tft.fillRoundRect(292, 6, 22, 30, 11, color_SWOOP);
+		tft.fillRoundRect(292, 204, 22, 30, 11, color_SWOOP);
+		
+		tft.fillRect(302, 14, 12, 22, color_SWOOP);
+		tft.fillRect(302, 204, 22, 22, color_SWOOP);
+		
+		tft.fillRoundRect(18, 9, 12, 27, 6, ST77XX_BLACK);
+		tft.fillRoundRect(18, 204, 12, 27, 6, ST77XX_BLACK);
+		
+		tft.fillRect(16, 6, 14, 3, color_SWOOP);
+		tft.fillRect(290, 6, 16, 3, color_SWOOP);
+		
+		tft.fillRect(16, 231, 14, 3, color_SWOOP);
+		tft.fillRect(290, 231, 16, 3, color_SWOOP);
+		
+		tft.fillRect(12, 36, 6, 33, color_SWOOP);
+		tft.fillRect(12, 171, 6, 33, color_SWOOP);
+		tft.fillRect(302, 36, 6, 33, color_SWOOP);
+		tft.fillRect(302, 171, 6, 33, color_SWOOP);
+		
+		tft.fillRoundRect(282, 9, 20, 27, 6, ST77XX_BLACK);
+		tft.fillRoundRect(282, 204, 20, 27, 6, ST77XX_BLACK);
+		
+		//inner border middle
+		tft.fillRect(12, 71, 6, 48, color_LABELTEXT2);
+		tft.fillRect(12, 121, 6, 48, color_LABELTEXT2);
+		tft.fillRect(302, 71, 6, 48, color_LABELTEXT2);
+		tft.fillRect(302, 121, 6, 48, color_LABELTEXT2);
+		
+		//use loop for all spectrum color edges
+		for (uint8_t j = 0; j < 8; j++) {
+			int nTempY = 38 + (j * 23);
+			//38, 61, 84, 107, 135, 158, 181
+			if (j > 3) {
+				nTempY = nTempY + 5;
+			}
+			//draw both rectangles of same color, 1 for each side, since Y coord already calculated
+			tft.fillRect(6, nTempY, 4, (j == 3 ? 26 : 21), mnThermalCameraLabels[j]);
+			tft.fillRect(310, nTempY, 4, (j == 3 ? 26 : 21), mnThermalCameraLabels[j]);
+		}
+		
 		
 	} else {		
 		//oThermalCamera.setRefreshRate(MLX90640_0_5_HZ);
