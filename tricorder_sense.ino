@@ -449,7 +449,7 @@ void setup() {
 	oButton7.onPressed(ToggleThermal);
 	//10k potentiometer / scroller should be limited to a readable range of 10-890
 	//analog write values can go from 0 to 255. analogRead can go from 0 to 2^(analogReadResolution)
-	analogReadResolution(10);
+	//analogReadResolution(10);
 	GoHome();
 }
 
@@ -458,12 +458,14 @@ void loop() {
 	//check this first in the loop, as everything else depends on it
 	//magnet from speaker throws z = ~ +14000, no magnets has z idle at ~ -500
 	//use z > 5000 ?
+	//all analogRead actions depend on resolution setting - changing this will screw with battery % readings
+	//the -700 threshold was based on resolution of 10, or 1024 max
 	//need tests with speaker above and door magnet below - may require testing within assembled shell
 	if ((millis() - mnLastMagnetCheck) > mnMagnetInterval) {
 		oMagneto.read();
-		if (!mbSleepMode && oMagneto.z < -700) {
+		if (!mbSleepMode && ((oMagneto.z / 16) < -700)) {
 			SleepMode();
-		} else if (mbSleepMode && oMagneto.z > -700) {
+		} else if (mbSleepMode && ((oMagneto.z / 16) > -700)) {
 			ActiveMode();
 		}
 		mnLastMagnetCheck = millis();
@@ -568,9 +570,8 @@ void RunNeoPixelColor(int nPin) {
 					case 2: ledPwrStrip.setPixelColor(0, 112, 128, 0); break;
 					case 1: ledPwrStrip.setPixelColor(0, 128, 96, 0); break;
 					default: ledPwrStrip.setPixelColor(0, 128, 0, 0); break;
-				}
-								
-			}
+				}								
+			}	//end if powercolorCycle
 						
 			mnLastUpdatePower = lTimer;
 			//ledPwrStrip.show();
@@ -578,10 +579,9 @@ void RunNeoPixelColor(int nPin) {
 		
 		//need to poll ID LED separate from power, as PWR only updates every 30 seconds
 		if (mnLastUpdateIDLED == 0 || ((lTimer - mnLastUpdateIDLED) > mnIDLEDInterval)) {
-			//set ID LED color based on value pulled from A1, edge prong of scroll potentiometer
+			//set ID LED color based on value pulled from A1, middle prong of scroll potentiometer
 			//colors range is purple > blue > green > yellow > orange > red > pink > white
-			//pin range is ~10-890 when ADC is 8 bit resolution.  ADC resolution will ALSO affect magnetometer readings.
-			uint16_t nScrollerValue = analogRead(PIN_SCROLL_INPUT);
+			uint16_t nScrollerValue = analogRead(PIN_SCROLL_INPUT) / 16;
 			uint16_t nTempColor = nScrollerValue;
 			if (nScrollerValue < 110) {
 				nTempColor = 0;
@@ -605,8 +605,8 @@ void RunNeoPixelColor(int nPin) {
 			//calling uint16 parameter function for set color was not working. converting uint16 to rgb
 			mnCurrentProfileRed = ((((mnIDLEDColorscape[nTempColor] >> 11) & 0x1F) * 527) + 23) >> 6;
 			mnCurrentProfileGreen = ((((mnIDLEDColorscape[nTempColor] >> 5) & 0x3F) * 259) + 33) >> 6;
-			mnCurrentProfileRedBlue = (((mnIDLEDColorscape[nTempColor] & 0x1F) * 527) + 23) >> 6;
-			ledPwrStrip.setPixelColor(1, mnCurrentProfileRed, mnCurrentProfileGreen, mnCurrentProfileRedBlue);
+			mnCurrentProfileBlue = (((mnIDLEDColorscape[nTempColor] & 0x1F) * 527) + 23) >> 6;
+			ledPwrStrip.setPixelColor(1, mnCurrentProfileRed, mnCurrentProfileGreen, mnCurrentProfileBlue);
 			
 			ledPwrStrip.show();
 			mnLastUpdateIDLED = lTimer;
@@ -719,11 +719,36 @@ void RunLeftScanner() {
 	} else {
 		//currently stacks "downward" - all on to only alpha on - which is more like an opening drape
 		switch (mnRGBCooldown) {
-			case 1: analogWrite(SCAN_LED_PIN_1, SCAN_LED_BRIGHTNESS); analogWrite(SCAN_LED_PIN_2, 0); analogWrite(SCAN_LED_PIN_3, 0); analogWrite(SCAN_LED_PIN_4, 0); break;
-			case 2: analogWrite(SCAN_LED_PIN_1, SCAN_LED_BRIGHTNESS); analogWrite(SCAN_LED_PIN_2, SCAN_LED_BRIGHTNESS); analogWrite(SCAN_LED_PIN_3, 0); analogWrite(SCAN_LED_PIN_4, 0); break;
-			case 3: analogWrite(SCAN_LED_PIN_1, SCAN_LED_BRIGHTNESS); analogWrite(SCAN_LED_PIN_2, SCAN_LED_BRIGHTNESS); analogWrite(SCAN_LED_PIN_3, SCAN_LED_BRIGHTNESS); analogWrite(SCAN_LED_PIN_4, 0); break;
-			case 4: analogWrite(SCAN_LED_PIN_1, SCAN_LED_BRIGHTNESS); analogWrite(SCAN_LED_PIN_2, SCAN_LED_BRIGHTNESS); analogWrite(SCAN_LED_PIN_3, SCAN_LED_BRIGHTNESS); analogWrite(SCAN_LED_PIN_4, SCAN_LED_BRIGHTNESS); break;
-			default: analogWrite(SCAN_LED_PIN_1, 0); analogWrite(SCAN_LED_PIN_2, 0); analogWrite(SCAN_LED_PIN_3, 0); analogWrite(SCAN_LED_PIN_4, 0); break;
+			case 1: 
+				analogWrite(SCAN_LED_PIN_1, SCAN_LED_BRIGHTNESS); 
+				analogWrite(SCAN_LED_PIN_2, 0); 
+				analogWrite(SCAN_LED_PIN_3, 0); 
+				analogWrite(SCAN_LED_PIN_4, 0); 
+				break;
+			case 2: 
+				analogWrite(SCAN_LED_PIN_1, SCAN_LED_BRIGHTNESS); 
+				analogWrite(SCAN_LED_PIN_2, SCAN_LED_BRIGHTNESS); 
+				analogWrite(SCAN_LED_PIN_3, 0); 
+				analogWrite(SCAN_LED_PIN_4, 0); 
+				break;
+			case 3: 
+				analogWrite(SCAN_LED_PIN_1, SCAN_LED_BRIGHTNESS); 
+				analogWrite(SCAN_LED_PIN_2, SCAN_LED_BRIGHTNESS); 
+				analogWrite(SCAN_LED_PIN_3, SCAN_LED_BRIGHTNESS); 
+				analogWrite(SCAN_LED_PIN_4, 0); 
+				break;
+			case 4: 
+				analogWrite(SCAN_LED_PIN_1, SCAN_LED_BRIGHTNESS); 
+				analogWrite(SCAN_LED_PIN_2, SCAN_LED_BRIGHTNESS); 
+				analogWrite(SCAN_LED_PIN_3, SCAN_LED_BRIGHTNESS); 
+				analogWrite(SCAN_LED_PIN_4, SCAN_LED_BRIGHTNESS); 
+				break;
+			default: 
+				analogWrite(SCAN_LED_PIN_1, 0); 
+				analogWrite(SCAN_LED_PIN_2, 0); 
+				analogWrite(SCAN_LED_PIN_3, 0); 
+				analogWrite(SCAN_LED_PIN_4, 0); 
+				break;
 		}
 	}
 }
@@ -994,7 +1019,6 @@ void ToggleRGBSensor() {
 	mbHumidBarComplete = false;
 	mbTempBarComplete = false;
 	mbBaromBarComplete = false;
-	//to-do: reset any microphone sensor values
 	
 	if (mbButton2Flag) {		
 		//to-do: if sensor disabled or not started, pulse message to display
@@ -1208,7 +1232,6 @@ void RunRGBSensor() {
 }	//end runRGBSensor
 
 void ShowBatteryLevel(int nPosX, int nPosY, uint16_t nLabelColor, uint16_t nValueColor) {
-	//to-do: use global setting to enable/disable battery voltage check
 	String sBatteryStatus = "";  
 	float fBattV = analogRead(VOLT_PIN);
 	
@@ -1223,16 +1246,14 @@ void ShowBatteryLevel(int nPosX, int nPosY, uint16_t nLabelColor, uint16_t nValu
 	fBattV = fBattV * 100;
 	fBattV = constrain(fBattV, 320, 420);
 	int nBattPct = map(fBattV, 320, 420, 0, 100);
-	/* */
 	//int nBattPct = map(fBattV, 0, 600, 0, 101);
 	
-	//need to use space characters to pad string because it'll wrap back around to left edge when cursor set over 240 (height).
+	//need to use space characters to pad string because it'll wrap back around to left edge when cursor starting point set over 240.
 	//this is a glitch of adafruit GFX library - it thinks display is 240x320 despite the rotation in setup() and setting for text wrap
 	//sBatteryStatus = "      " + String((int)fBattV);
 	sBatteryStatus = String(nBattPct);
 	drawParamText(nPosX + GetBuffer(nBattPct), nPosY, const_cast<char*>(sBatteryStatus.c_str()), color_MAINTEXT);
 	
-	//drawParamText(nPosX, nPosY, "POWER", color_LABELTEXT);
 }
 
 void ToggleClimateSensor() {
@@ -1242,7 +1263,6 @@ void ToggleClimateSensor() {
 	mnRGBCooldown = 0;
 	mnClimateCooldown = 0;	
 	mbRGBActive = false;
-	//to-do: reset any microphone sensor values
 	mbMicrophoneActive = false;
 	mbHomeActive = false;
 	mbThermalActive = false;
@@ -1763,7 +1783,7 @@ void RunThermal() {
 	
 	if (!mbThermalCameraStarted) {
 		tft.fillRect(150, 80, 70, 40, ST77XX_BLACK);
-		drawParamText(150, 100, "THERMALOPTICS OFFLINE", color_HEADER);
+		drawParamText(110, 169, "THERMALOPTICS OFFLINE", color_HEADER);
 		//set value for screen blanked so this doesn't constantly get redrawn
 		return;
 	}
@@ -1771,10 +1791,7 @@ void RunThermal() {
 	//pimoroni camera "bottom" of view is section with pin holes
 	//use 30fps cap to restrict how often it tries to pull camera data, or this will block button press polling
 	//need 2 data frames for each displayed frame, as it only pulls half the range at a time.
-	if ((millis() - mnLastCameraFrame) > mnThermalCameraInterval) {
-		//tft.fillRect(20, 0, 120, 20, ST77XX_BLACK);
-		//drawParamText(20, 20, "THERM OK", color_HEADER);
-		
+	if ((millis() - mnLastCameraFrame) > mnThermalCameraInterval) {		
 		//iterate through full frame capture, then do 1 draw with all values
 		for (byte i = 0; i < 2; i++) {
 			uint16_t arrTempFrameRaw[834];
