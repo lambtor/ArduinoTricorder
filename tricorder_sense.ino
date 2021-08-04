@@ -41,6 +41,9 @@
 //buttons, scroller	- d2 pin supposed to be pin #2
 //button on the board is connected to pin 7.  TX is pin 0, RX is pin 1 - these are normally used for serial communication
 //#define PIN_D2						PIN_NFC2
+//need to modify your system_nrf52.c file to have the following line:
+//#define CONFIG_NFCT_PINS_AS_GPIOS (1)
+//YOU WILL SEE THIS IN THAT FILE, with conditional logic around it to actually free up the NFC pins.
 
 #define BUTTON_1_PIN				PIN_SERIAL1_RX
 #define BUTTON_2_PIN				PIN_SERIAL1_TX
@@ -111,6 +114,11 @@
 #define color_REDLABELTEXT		0xE000
 #define color_REDDARKLABELTEXT	0x9800
 #define color_REDDATATEXT		0xDEFB
+
+//use labeltext3 for servo ltpurple
+#define color_SERVOPINK			0xFE18
+#define color_SERVOPURPLE		0x83B7
+
 
 #define RGBto565(r,g,b) ((((r) & 0xF8) << 8) | (((g) & 0xFC) << 3) | ((b) >> 3))
 
@@ -286,7 +294,7 @@ bool mbThermalCameraStarted = false;
 bool mbThermalActive = false;
 //this interval caps draw and thermal data frame rates. camera data will run slower than 30fps, but this throttle is needed to allow button press event polling
 uint8_t mnThermalCameraInterval = 16;
-int mnLastCameraFrame = 0;
+unsigned long mnLastCameraFrame = 0;
 //this must be less than 10 for all data to be displayed on 320x240. 
 //this scales display window to 256 x 192, a border of 24px all around
 uint16_t mnThermalPixelWidth = 8;
@@ -316,11 +324,18 @@ const uint16_t mnarrThermalDisplayColors[] = {0x480F, 0x400F,0x400F,0x400F,0x401
 ,0xF841,0xF8A2,0xF8E3,0xF945,0xF986,0xF9E7,0xFA28,0xFA8A,0xFACB,0xFB2C,0xFB6D,0xFBCF,0xFC10,0xFC71,0xFCB2,0xFD14,0xFD55,0xFDB6,0xFDF7,0xFD59
 ,0xFE9A,0xFEFB,0xFF3C,0xFF9E};
 
+bool mbTomServoActive = false;
+unsigned long mnButton2Press = 0;
+unsigned long mnButton3Press = 0;
+
+
+
 //to-do:
 //left side led stacking mode for countdown to color scanner action
 //tom servo screen creation with canned animation using trigger mapped to met / bio buttons pressed simultaneously
 
 void setup() {
+	//NRF_UICR->NFCPINS = 0;
 	ledPwrStrip.begin();
 	ledBoard.begin();
 	
@@ -493,6 +508,7 @@ void loop() {
 	RunClimateSensor();
 	RunMicrophone();	
 	RunThermal();
+	RunTomServo();
 }
 
 void SleepMode() {
@@ -991,19 +1007,24 @@ void RunHome() {
 
 void ResetWireClock() {
 	//Wire.endTransmission(MLX90640_I2CADDR_DEFAULT);
-	//all sensors on i2c use 100,000 rate. adafruit board definitions force any call to this under 100k to use 100k.
+	//all sensors on i2c use 100,000 rate. 
+	//adafruit board definitions force any call to this under 100k up to 100k.
 	Wire.flush();
 	Wire.setClock(100000);
 }
 
 void SetThermalClock() {
-	//max viable speed on this board. used only for thermal camera. adafruit board definitions force any call to this over 400k to use 400k.
+	//max viable speed on this board. used only for thermal camera. 
+	//adafruit board definitions force any call to this with over 400k down to 400k.
 	Wire.flush();	
 	Wire.setClock(400000);
 }
 
 void ToggleRGBSensor() {
 	ResetWireClock();
+	
+	//set timestamp of button press and check if this activates tomservo
+	
 	mbButton2Flag = !mbButton2Flag;
 	//reset any temperature app values
 	mbTempActive = false;
@@ -1019,6 +1040,7 @@ void ToggleRGBSensor() {
 	mbHumidBarComplete = false;
 	mbTempBarComplete = false;
 	mbBaromBarComplete = false;
+	mbTomServoActive = false;
 	
 	if (mbButton2Flag) {		
 		//to-do: if sensor disabled or not started, pulse message to display
@@ -1257,7 +1279,7 @@ void ShowBatteryLevel(int nPosX, int nPosY, uint16_t nLabelColor, uint16_t nValu
 }
 
 void ToggleClimateSensor() {
-	ResetWireClock();
+	ResetWireClock();		
 	mbButton1Flag = !mbButton1Flag;
 	//reset any rgb sensor values
 	mnRGBCooldown = 0;
@@ -1266,6 +1288,7 @@ void ToggleClimateSensor() {
 	mbMicrophoneActive = false;
 	mbHomeActive = false;
 	mbThermalActive = false;
+	mbTomServoActive = false;
 	
 	if (mbButton1Flag) {		
 		if (!mbTempActive) {
@@ -1468,6 +1491,8 @@ void RunClimateSensor() {
 void ToggleMicrophone() {
 	ResetWireClock();
 	
+	//set timestamp of button press and check if this activates tomservo
+	
 	mbButton3Flag = !mbButton3Flag;
 	//reset any rgb sensor values
 	mnRGBCooldown = 0;
@@ -1486,6 +1511,7 @@ void ToggleMicrophone() {
 	mbHumidBarComplete = false;
 	mbTempBarComplete = false;
 	mbBaromBarComplete = false;
+	mbTomServoActive = false;
 	
 	if (mbButton3Flag) {
 		DisableSound();
@@ -1704,6 +1730,8 @@ void RunMicrophone() {
 
 void ToggleThermal() {
 	if (!mbThermalCameraStarted) return;
+	mbTomServoActive = false;
+	
 	mbButton7Flag = !mbButton7Flag;
 	
 	if (mbButton7Flag) {
@@ -2171,7 +2199,7 @@ void UpdateClimateBarGraph(int nBarIndex, uint16_t nBarColor) {
 }
 
 void UpdateMicrophoneGraph(short nMaxDataValue, uint16_t nBarColor) {
-    short nGraphMinX = 66;
+	short nGraphMinX = 66;
     short nGraphMinY = 97;
     short nGraphZeroY = 163;
     short nBarWidth = 13;
@@ -2212,4 +2240,101 @@ void UpdateMicrophoneGraph(short nMaxDataValue, uint16_t nBarColor) {
 
 	//reset refresh flag to false?
 	mbMicrophoneRedraw = false;
+}
+
+void ActivateTomServo() {
+	mnRGBCooldown = 0;
+	mnClimateCooldown = 0;
+	mbHomeActive = true;
+	mbRGBActive = false;
+	mbTempActive = false;
+	
+	mbButton1Flag = false;
+	mbButton2Flag = false;
+	mbButton3Flag = false;
+	
+	//reset any bar graph values from climate
+	mnTempTargetBar = 0;
+	mnTempCurrentBar = 0;
+	mnHumidTargetBar = 0;
+	mnHumidCurrentBar = 0;
+	mnBaromTargetBar = 0;
+	mnBaromCurrentBar = 0;
+	mbHumidBarComplete = false;
+	mbTempBarComplete = false;
+	mbBaromBarComplete = false;
+	mbThermalActive = false;
+	
+	ResetWireClock();
+	
+	//58x237, 21 round
+	tft.fillRoundRect(1, 3, 70, 237, 21, color_HEADER);
+	tft.fillRoundRect(51, 11, 19, 229, 8, color_HEADER);
+	//58, 4
+	tft.fillRect(1, 62, 50, 56, color_MAINTEXT);
+	tft.fillRect(1, 58, 51, 4, ST77XX_BLACK);
+	tft.fillRect(1, 118, 51, 4, ST77XX_BLACK);
+	tft.fillRect(1, 179, 51, 4, color_MAINTEXT);
+	tft.fillRect(26, 3, 55, 8, color_HEADER);
+	tft.fillRect(89, 3, 149, 8, color_HEADER);
+	tft.fillRect(246, 3, 74, 8, color_HEADER);
+	//tft.drawFastHLine();	
+	
+	//32x13 med purple
+	tft.fillRect(67, 62, 32, 13, color_SERVOPURPLE);
+	tft.fillRect(67, 122, 32, 13, color_SERVOPURPLE);
+	tft.fillRect(67, 183, 32, 13, color_SERVOPURPLE);
+	tft.fillRect(186, 62, 32, 13, color_SERVOPURPLE);
+	tft.fillRect(186, 122, 32, 13, color_SERVOPURPLE);
+	
+	//102, 80*13 lt purple left	
+	tft.fillRect(102, 62, 80, 13, color_LABELTEXT3);
+	tft.fillRect(102, 122, 80, 13, color_LABELTEXT3);
+	tft.fillRect(102, 183, 80, 13, color_LABELTEXT3);
+	//221, 95*13 lt purple right
+	tft.fillRect(221, 62, 95, 13, color_LABELTEXT3);
+	tft.fillRect(221, 122, 95, 13, color_LABELTEXT3);
+	
+	tft.fillRect(67, 79, 32, 39, color_SERVOPINK);
+	tft.fillRect(67, 139, 32, 39, color_SERVOPINK);
+	tft.fillRect(67, 200, 32, 40, color_SERVOPINK);
+	tft.fillRect(186, 79, 32, 39, color_SERVOPINK);
+	tft.fillRect(186, 139, 32, 101, color_SERVOPINK);
+	
+	//use big text size for [BIO   SCAN] and SERVO
+	tft.setFont(&lcars15pt7b);
+	drawParamText(225, 43, "[BIO   SCAN]", ST77XX_WHITE);
+	drawParamText(10, 202, "SERVO", ST77XX_BLACK);
+	
+	tft.setFont(&lcars11pt7b);
+	drawParamText(7, 78, "CAMBOT", ST77XX_BLACK);
+	drawParamText(7, 95, "GYPSY", ST77XX_BLACK);
+	drawParamText(7, 113, "CROOOOW", ST77XX_BLACK);
+	//repeat to yourself it's just a show
+	drawParamText(70, 36, "REPEAT TO", color_LABELTEXT);
+	drawParamText(70, 52, "YOURSELF", color_LABELTEXT);
+	drawParamText(147, 36, "IT'S JUST A SHOW", color_MAINTEXT);
+	
+	drawTinyInt(86, 70, 800, ST77XX_BLACK, color_SERVOPURPLE);
+	drawTinyInt(84, 70, 900, ST77XX_BLACK, color_SERVOPURPLE);
+	drawTinyInt(84, 70, 1000, ST77XX_BLACK, color_SERVOPURPLE);
+	drawTinyInt(203, 70, 1100, ST77XX_BLACK, color_SERVOPURPLE);
+	drawTinyInt(203, 130, 1200, ST77XX_BLACK, color_SERVOPURPLE);
+	
+	drawTinyInt(127, 5, 1200, ST77XX_BLACK, color_HEADER);
+	drawTinyInt(150, 5, 1200, ST77XX_BLACK, color_HEADER);
+	tft.fillRoundRect(122, 25, 14, 11, 5, color_MAINTEXT);
+	
+	//actual robot drawing
+	tft.fillCircle(273, 156, 12, ST77XX_WHITE);	
+	tft.fillCircle(249, 206, 4, ST77XX_WHITE);	
+	tft.fillCircle(298, 206, 4, ST77XX_WHITE);	
+	tft.fillRect(269, 141, 9, 4, ST77XX_RED);
+	tft.fillRect(269, 141, 9, 4, ST77XX_RED);
+	tft.fillRect(269, 141, 9, 4, ST77XX_RED);
+}
+
+void RunTomServo() {
+	if (!mbTomServoActive) return;	
+	//animate 4 trash graphs	
 }
