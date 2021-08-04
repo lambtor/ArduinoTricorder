@@ -18,7 +18,7 @@ separate board:</strong>       OK</li>
 door close to sleep:</strong>  OK</li>
 <li><strong>ID LED (8) color <br/>
 change via <br/>
-potentiometer:</strong>  OK</li>
+potentiometer:</strong>  OK</li> 
   </ul>
 <br/>
 Draw operations on the display from the arduino aren't that fast.  The FFT draw code calculates a list of bar heights, then uses fillRect() to create the bars.  At the end of the bar drawing operations, these bar heights are stored in a "previous" bar height array.  From that point on, each bar draw operation calculates the difference between "new" bar heights and "previous".  If "new" is larger than "previous", it only draws enough to extend the "previous" height to the "new" one.  If "new" is less than "previous", it draws black lines to shorten the "previous" height down to the "new" one.  This relative display update method removes the use of a full screen blank operation, and minimizes flickering.<br/>
