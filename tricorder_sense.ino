@@ -168,7 +168,7 @@ unsigned long mnLastUpdateBoardBlueLED = 0;
 bool mbBoardRedLED = false;
 bool mbBoardBlueLED = false;
 //colors range is purple > blue > green > yellow > orange > red > pink > white
-const uint32_t mnIDLEDColorscape[] = {0x8010,0x0010,0x0400,0x5C60,0x8300,0x8000,0x8208,0x8410};
+const uint32_t mnIDLEDColorscape[] = {0x8010,0x0010,0x0400,0x7C20,0x8300,0x8000,0x8208,0x8410};
 const String marrProfiles[] = {"ALPHA","BETA","GAMMA","DELTA","EPSILON","ZETA","ETA","THETA"};
 const uint16_t mnThermalCameraLabels[] = {0xD6BA,0xC0A3,0xD541,0xD660,0x9E02,0x0458,0x89F1};
 
@@ -597,7 +597,7 @@ void RunNeoPixelColor(int nPin) {
 		if (mnLastUpdateIDLED == 0 || ((lTimer - mnLastUpdateIDLED) > mnIDLEDInterval)) {
 			//set ID LED color based on value pulled from A1, middle prong of scroll potentiometer
 			//colors range is purple > blue > green > yellow > orange > red > pink > white
-			uint16_t nScrollerValue = analogRead(PIN_SCROLL_INPUT) / 16;
+			uint16_t nScrollerValue = analogRead(PIN_SCROLL_INPUT);
 			uint16_t nTempColor = nScrollerValue;
 			if (nScrollerValue < 110) {
 				nTempColor = 0;
@@ -813,8 +813,8 @@ void GoHome() {
 	//middle section - needs to be split for profile name and color
 	//tft.fillRect(1, 39, 58, 164, color_HEADER);
 	//dull all LED colors by 50% to lcarsify them
-	tft.fillRect(1, 39, 58, 76, RGBto565((int)(mnCurrentProfileRed / 2), (int)(mnCurrentProfileGreen / 2), (int)(mnCurrentProfileBlue / 2)));
-	tft.fillRect(1, 147, 58, 55, RGBto565((int)(mnCurrentProfileRed / 2), (int)(mnCurrentProfileGreen / 2), (int)(mnCurrentProfileBlue / 2)));
+	tft.fillRect(1, 39, 58, 76, RGBto565((int)min(mnCurrentProfileRed*1.75, 255), (int)min(mnCurrentProfileGreen*1.75, 255), (int)min(mnCurrentProfileBlue*1.75, 255)));
+	tft.fillRect(1, 147, 58, 55, RGBto565((int)min(mnCurrentProfileRed*1.75, 255), (int)min(mnCurrentProfileGreen*1.75, 255), (int)min(mnCurrentProfileBlue*1.75, 255)));
 	//profile label always shows bkg as header color - this is a notification
 	tft.fillRect(1, 119, 58, 24, color_HEADER);
 	drawParamText(6, 138, msCurrentProfileName, ST77XX_BLACK);
@@ -882,7 +882,7 @@ void GoHome() {
 		//tft.fillRoundRect(279, 119, 24, 24, 11, color_LABELTEXT4);
 		//tft.fillRect(230, 119, 65, 24, color_LABELTEXT4);
 		//drawParamText(239, 138, mbHumidityInitialized ? "ONLINE" : "PARTIAL", ST77XX_BLACK);
-		tft.fillRoundRect(70, 119, 119, 34, 17, (mbHumidityInitialized ? color_LABELTEXT4 : color_LABELTEXT3));
+		tft.fillRoundRect(70, 119, 113, 34, 17, (mbHumidityInitialized ? color_LABELTEXT4 : color_LABELTEXT3));
 		tft.fillRect(70, 119, 18, 34, (mbHumidityInitialized ? color_LABELTEXT4 : color_LABELTEXT3));		
 	} else if (mbHumidityInitialized) {
 		//tft.fillRect(76, 119, 139, 24, color_LABELTEXT3);
@@ -890,7 +890,7 @@ void GoHome() {
 		//tft.fillRoundRect(279, 150, 24, 24, 11, color_LABELTEXT3);
 		//tft.fillRect(230, 119, 65, 24, color_LABELTEXT3);
 		//drawParamText(239, 138, "PARTIAL", ST77XX_BLACK);
-		tft.fillRoundRect(70, 119, 119, 34, 17, color_LABELTEXT3);
+		tft.fillRoundRect(70, 119, 113, 34, 17, color_LABELTEXT3);
 		tft.fillRect(70, 119, 18, 34, color_LABELTEXT3);
 	} else {
 		//offline, show no round cap
@@ -905,7 +905,7 @@ void GoHome() {
 		//tft.fillRoundRect(279, 150, 24, 24, 11, color_LABELTEXT4);
 		//tft.fillRect(230, 150, 65, 24, color_LABELTEXT4);		
 		//drawParamText(239, 169, "ONLINE", ST77XX_BLACK);
-		tft.fillRoundRect(70, 168, 119, 34, 17, color_LABELTEXT4);
+		tft.fillRoundRect(70, 168, 113, 34, 17, color_LABELTEXT4);
 		tft.fillRect(70, 168, 18, 34, color_LABELTEXT4);
 	} else {		
 		tft.fillRect(70, 168, 82, 34, color_LABELTEXT2);
@@ -918,7 +918,7 @@ void GoHome() {
 		//tft.fillRoundRect(279, 181, 24, 24, 11, color_LABELTEXT4);
 		//tft.fillRect(230, 181, 65, 24, color_LABELTEXT4);
 		//drawParamText(239, 200, "ONLINE", ST77XX_BLACK);
-		tft.fillRoundRect(192, 119, 119, 34, 17, color_LABELTEXT4);
+		tft.fillRoundRect(192, 119, 113, 34, 17, color_LABELTEXT4);
 		tft.fillRect(192, 119, 18, 34, color_LABELTEXT4);
 	} else {
 		//tft.fillRect(76, 181, 139, 24, color_LABELTEXT2);
@@ -928,7 +928,7 @@ void GoHome() {
 	drawParamText(200, 142, "SONICS", ST77XX_BLACK);
 	
 	if (mbThermalCameraStarted) {
-		tft.fillRoundRect(192, 168, 119, 34, 17, color_LABELTEXT4);
+		tft.fillRoundRect(192, 168, 113, 34, 17, color_LABELTEXT4);
 		tft.fillRect(192, 168, 18, 34, color_LABELTEXT4);
 	} else {
 		tft.fillRect(192, 168, 82, 34, color_LABELTEXT2);
@@ -937,20 +937,20 @@ void GoHome() {
 	
 	
 	//black lines to separate rectangles from caps
-	tft.drawFastHLine(152, 119, 84, ST77XX_BLACK);
-	tft.drawFastHLine(153, 119, 84, ST77XX_BLACK);
-	tft.drawFastHLine(154, 119, 84, ST77XX_BLACK);
-	tft.drawFastHLine(155, 119, 84, ST77XX_BLACK);
-	tft.drawFastHLine(156, 119, 84, ST77XX_BLACK);
-	tft.drawFastHLine(157, 119, 84, ST77XX_BLACK);
-	tft.drawFastHLine(158, 119, 84, ST77XX_BLACK);
-	tft.drawFastHLine(275, 119, 84, ST77XX_BLACK);
-	tft.drawFastHLine(276, 119, 84, ST77XX_BLACK);
-	tft.drawFastHLine(277, 119, 84, ST77XX_BLACK);
-	tft.drawFastHLine(278, 119, 84, ST77XX_BLACK);
-	tft.drawFastHLine(279, 119, 84, ST77XX_BLACK);
-	tft.drawFastHLine(280, 119, 84, ST77XX_BLACK);
-	tft.drawFastHLine(281, 119, 84, ST77XX_BLACK);
+	tft.drawFastVLine(152, 119, 84, ST77XX_BLACK);
+	tft.drawFastVLine(153, 119, 84, ST77XX_BLACK);
+	tft.drawFastVLine(154, 119, 84, ST77XX_BLACK);
+	tft.drawFastVLine(155, 119, 84, ST77XX_BLACK);
+	tft.drawFastVLine(156, 119, 84, ST77XX_BLACK);
+	tft.drawFastVLine(157, 119, 84, ST77XX_BLACK);
+	tft.drawFastVLine(158, 119, 84, ST77XX_BLACK);
+	tft.drawFastVLine(275, 119, 84, ST77XX_BLACK);
+	tft.drawFastVLine(276, 119, 84, ST77XX_BLACK);
+	tft.drawFastVLine(277, 119, 84, ST77XX_BLACK);
+	tft.drawFastVLine(278, 119, 84, ST77XX_BLACK);
+	tft.drawFastVLine(279, 119, 84, ST77XX_BLACK);
+	tft.drawFastVLine(280, 119, 84, ST77XX_BLACK);
+	tft.drawFastVLine(281, 119, 84, ST77XX_BLACK);
 			
 }
 
@@ -984,11 +984,16 @@ void RunHome() {
 		drawParamText(185, 75, sUptime, color_MAINTEXT);
 		
 		//show profile color and name in left frame border
-		tft.fillRect(1, 39, 58, 76, RGBto565((int)(mnCurrentProfileRed / 2), (int)(mnCurrentProfileGreen / 2), (int)(mnCurrentProfileBlue)));
-		tft.fillRect(1, 147, 58, 55, RGBto565((int)(mnCurrentProfileRed / 2), (int)(mnCurrentProfileGreen / 2), (int)(mnCurrentProfileBlue)));
+		//tft.fillRect(1, 39, 58, 76, RGBto565((int)(mnCurrentProfileRed), (int)(mnCurrentProfileGreen), (int)(mnCurrentProfileBlue)));
+		//tft.fillRect(1, 147, 58, 55, RGBto565((int)(mnCurrentProfileRed), (int)(mnCurrentProfileGreen), (int)(mnCurrentProfileBlue)));
+		tft.fillRect(1, 39, 58, 76, RGBto565((int)min(mnCurrentProfileRed*1.75, 255), (int)min(mnCurrentProfileGreen*1.75, 255), (int)min(mnCurrentProfileBlue*1.75, 255)));
+		tft.fillRect(1, 147, 58, 55, RGBto565((int)min(mnCurrentProfileRed*1.75, 255), (int)min(mnCurrentProfileGreen*1.75, 255), (int)min(mnCurrentProfileBlue*1.75, 255)));
 		//profile label always shows bkg as header color
 		tft.fillRect(1, 119, 58, 24, color_HEADER);
 		drawParamText(6, 138, msCurrentProfileName, ST77XX_BLACK);
+		
+		//tft.fillRect(250, 60, 60, 20, ST77XX_BLACK);
+		//drawParamText(250, 75, (String)analogRead(PIN_SCROLL_INPUT), color_MAINTEXT); 
 		
 		mnLastUpdateHome = millis();
 	}
