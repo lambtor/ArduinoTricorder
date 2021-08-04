@@ -78,7 +78,7 @@
 //#define PIN_SERIAL1_TX       (0)
 
 //system os version #. max 3 digits
-#define DEVICE_VERSION			"0.87"
+#define DEVICE_VERSION			"0.88"
 
 // TNG colors here
 #define color_SWOOP				0xF7B3
@@ -168,7 +168,7 @@ unsigned long mnLastUpdateBoardBlueLED = 0;
 bool mbBoardRedLED = false;
 bool mbBoardBlueLED = false;
 //colors range is purple > blue > green > yellow > orange > red > pink > white
-const uint32_t mnIDLEDColorscape[] = {0x8010,0x0010,0x0400,0x7C20,0x8300,0x8000,0x8208,0x8410};
+const uint32_t mnIDLEDColorscape[] = {0x8010,0x0010,0x0400,0x7C20,0x8300,0x8000,0x8208,0x7C30};
 const String marrProfiles[] = {"ALPHA","BETA","GAMMA","DELTA","EPSILON","ZETA","ETA","THETA"};
 const uint16_t mnThermalCameraLabels[] = {0xD6BA,0xC0A3,0xD541,0xD660,0x9E02,0x0458,0x89F1};
 
@@ -459,7 +459,8 @@ void setup() {
 	
 	oButton3.begin();
 	oButton3.onPressed(ToggleMicrophone);
-		
+	//oButton3.onPressed(ActivateTomServo);
+	
 	oButton7.begin();
 	oButton7.onPressed(ToggleThermal);
 	//10k potentiometer / scroller should be limited to a readable range of 10-890
@@ -815,8 +816,8 @@ void GoHome() {
 	//dull all LED colors by 50% to lcarsify them
 	tft.fillRect(1, 39, 58, 76, RGBto565((int)min(mnCurrentProfileRed*1.75, 255), (int)min(mnCurrentProfileGreen*1.75, 255), (int)min(mnCurrentProfileBlue*1.75, 255)));
 	tft.fillRect(1, 147, 58, 55, RGBto565((int)min(mnCurrentProfileRed*1.75, 255), (int)min(mnCurrentProfileGreen*1.75, 255), (int)min(mnCurrentProfileBlue*1.75, 255)));
-	//profile label always shows bkg as header color - this is a notification
-	tft.fillRect(1, 119, 58, 24, color_HEADER);
+	//profile label always shows bkg as swoop color 
+	tft.fillRect(1, 119, 58, 24, color_SWOOP);
 	drawParamText(6, 138, msCurrentProfileName, ST77XX_BLACK);
 	
 	
@@ -988,8 +989,8 @@ void RunHome() {
 		//tft.fillRect(1, 147, 58, 55, RGBto565((int)(mnCurrentProfileRed), (int)(mnCurrentProfileGreen), (int)(mnCurrentProfileBlue)));
 		tft.fillRect(1, 39, 58, 76, RGBto565((int)min(mnCurrentProfileRed*1.75, 255), (int)min(mnCurrentProfileGreen*1.75, 255), (int)min(mnCurrentProfileBlue*1.75, 255)));
 		tft.fillRect(1, 147, 58, 55, RGBto565((int)min(mnCurrentProfileRed*1.75, 255), (int)min(mnCurrentProfileGreen*1.75, 255), (int)min(mnCurrentProfileBlue*1.75, 255)));
-		//profile label always shows bkg as header color
-		tft.fillRect(1, 119, 58, 24, color_HEADER);
+		//profile label always shows bkg as swoop color
+		tft.fillRect(1, 119, 58, 24, color_SWOOP);
 		drawParamText(6, 138, msCurrentProfileName, ST77XX_BLACK);
 		
 		//tft.fillRect(250, 60, 60, 20, ST77XX_BLACK);
@@ -1734,11 +1735,16 @@ void RunMicrophone() {
 }	//end runmic
 
 void ToggleThermal() {
-	if (!mbThermalCameraStarted) return;
 	mbTomServoActive = false;
 	
 	mbButton7Flag = !mbButton7Flag;
 	
+	if (!mbThermalCameraStarted) {
+		tft.fillRect(150, 80, 70, 40, ST77XX_BLACK);
+		drawParamText(110, 169, "THERMALOPTICS OFFLINE", color_HEADER);
+		return;
+	}
+		
 	if (mbButton7Flag) {
 		//Wire.beginTransmission(MLX90640_I2CADDR_DEFAULT);
 		tft.fillScreen(ST77XX_BLACK);
@@ -2250,7 +2256,7 @@ void UpdateMicrophoneGraph(short nMaxDataValue, uint16_t nBarColor) {
 void ActivateTomServo() {
 	mnRGBCooldown = 0;
 	mnClimateCooldown = 0;
-	mbHomeActive = true;
+	mbHomeActive = false;
 	mbRGBActive = false;
 	mbTempActive = false;
 	
@@ -2271,19 +2277,20 @@ void ActivateTomServo() {
 	mbThermalActive = false;
 	
 	ResetWireClock();
+	tft.fillScreen(ST77XX_BLACK);
 	
 	//58x237, 21 round
 	tft.fillRoundRect(1, 3, 70, 237, 21, color_HEADER);
-	tft.fillRoundRect(51, 11, 19, 229, 8, color_HEADER);
+	tft.fillRoundRect(51, 11, 21, 237, 8, ST77XX_BLACK);
 	//58, 4
 	tft.fillRect(1, 62, 50, 56, color_MAINTEXT);
 	tft.fillRect(1, 58, 51, 4, ST77XX_BLACK);
 	tft.fillRect(1, 118, 51, 4, ST77XX_BLACK);
-	tft.fillRect(1, 179, 51, 4, color_MAINTEXT);
+	tft.fillRect(1, 179, 51, 4, ST77XX_BLACK);
 	tft.fillRect(26, 3, 55, 8, color_HEADER);
 	tft.fillRect(89, 3, 149, 8, color_HEADER);
 	tft.fillRect(246, 3, 74, 8, color_HEADER);
-	//tft.drawFastHLine();	
+	tft.fillRect(1, 200, 25, 40, color_HEADER);
 	
 	//32x13 med purple
 	tft.fillRect(67, 62, 32, 13, color_SERVOPURPLE);
@@ -2309,34 +2316,51 @@ void ActivateTomServo() {
 	//use big text size for [BIO   SCAN] and SERVO
 	tft.setFont(&lcars15pt7b);
 	drawParamText(225, 43, "[BIO   SCAN]", ST77XX_WHITE);
-	drawParamText(10, 202, "SERVO", ST77XX_BLACK);
-	
+		
 	tft.setFont(&lcars11pt7b);
-	drawParamText(7, 78, "CAMBOT", ST77XX_BLACK);
-	drawParamText(7, 95, "GYPSY", ST77XX_BLACK);
-	drawParamText(7, 113, "CROOOOW", ST77XX_BLACK);
+	drawParamText(9, 204, "SERVO", ST77XX_BLACK);
+	
+	drawParamText(4, 79, "CAMBOT", ST77XX_BLACK);
+	drawParamText(4, 96, "GYPSY", ST77XX_BLACK);
+	drawParamText(4, 114, "CROOOW", ST77XX_BLACK);
 	//repeat to yourself it's just a show
-	drawParamText(70, 36, "REPEAT TO", color_LABELTEXT);
-	drawParamText(70, 52, "YOURSELF", color_LABELTEXT);
-	drawParamText(147, 36, "IT'S JUST A SHOW", color_MAINTEXT);
+	drawParamText(70, 35, "REPEAT TO YOURSELF", color_LABELTEXT);
+	drawParamText(70, 54, "IT'S JUST A SHOW", color_LABELTEXT);
+	//drawParamText(147, 36, "IT'S JUST A SHOW", color_MAINTEXT);
 	
 	drawTinyInt(86, 70, 800, ST77XX_BLACK, color_SERVOPURPLE);
-	drawTinyInt(84, 70, 900, ST77XX_BLACK, color_SERVOPURPLE);
-	drawTinyInt(84, 70, 1000, ST77XX_BLACK, color_SERVOPURPLE);
-	drawTinyInt(203, 70, 1100, ST77XX_BLACK, color_SERVOPURPLE);
+	drawTinyInt(86, 130, 900, ST77XX_BLACK, color_SERVOPURPLE);
+	drawTinyInt(83, 190, 1000, ST77XX_BLACK, color_SERVOPURPLE);
+	drawTinyInt(205, 70, 1100, ST77XX_BLACK, color_SERVOPURPLE);
 	drawTinyInt(203, 130, 1200, ST77XX_BLACK, color_SERVOPURPLE);
 	
 	drawTinyInt(127, 5, 1200, ST77XX_BLACK, color_HEADER);
-	drawTinyInt(150, 5, 1200, ST77XX_BLACK, color_HEADER);
-	tft.fillRoundRect(122, 25, 14, 11, 5, color_MAINTEXT);
+	drawTinyInt(150, 5, 1000, ST77XX_BLACK, color_HEADER);
+	//tft.fillRoundRect(122, 25, 14, 11, 5, color_MAINTEXT);
 	
 	//actual robot drawing
-	tft.fillCircle(273, 156, 12, ST77XX_WHITE);	
+	tft.fillCircle(273, 154, 11, ST77XX_WHITE);	
 	tft.fillCircle(249, 206, 4, ST77XX_WHITE);	
-	tft.fillCircle(298, 206, 4, ST77XX_WHITE);	
-	tft.fillRect(269, 141, 9, 4, ST77XX_RED);
-	tft.fillRect(269, 141, 9, 4, ST77XX_RED);
-	tft.fillRect(269, 141, 9, 4, ST77XX_RED);
+	tft.fillCircle(298, 206, 4, ST77XX_WHITE);
+	tft.fillRect(250, 178, 46, 13, ST77XX_WHITE);
+	tft.fillRect(268, 165, 10, 53, ST77XX_RED);
+	tft.fillRect(268, 141, 10, 4, ST77XX_RED);
+	tft.fillRect(262, 178, 6, 40, ST77XX_RED);
+	tft.fillRect(278, 178, 6, 40, ST77XX_RED);
+	tft.drawRect(270, 192, 6, 15, ST77XX_WHITE);
+	//mouth
+	tft.fillRect(271, 169, 4, 4, ST77XX_WHITE);	
+	//arms
+	tft.drawLine(250, 191, 248, 202, ST77XX_WHITE);
+	tft.drawLine(251, 203, 258, 190, ST77XX_WHITE);
+	tft.drawLine(286, 190, 296, 203, ST77XX_WHITE);
+	tft.drawLine(295, 190, 299, 203, ST77XX_WHITE);
+	//base
+	tft.fillRect(260, 218, 26, 20, ST77XX_WHITE);
+	//triangles require 3 pairs of x,y then color
+	tft.fillTriangle(259, 218, 259, 237, 254, 237, ST77XX_WHITE);
+	tft.fillTriangle(286, 218, 286, 237, 291, 237, ST77XX_WHITE);
+	
 }
 
 void RunTomServo() {
