@@ -299,7 +299,7 @@ unsigned long mnLastCameraFrame = 0;
 //this scales display window to 256 x 192, a border of 24px all around
 uint16_t mnThermalPixelWidth = 8;
 uint16_t mnThermalPixelHeight = 8;
-uint8_t mnCameraDisplayStartX = 24;
+uint8_t mnCameraDisplayStartX = 32;
 uint8_t mnCameraDisplayStartY = 24;
 //16hz ~= 16fps
 //while this is editable, it's probably not worth the time to decode and re-encode just to convert it to the desired LCARS color scheme
@@ -1761,6 +1761,7 @@ void ToggleThermal() {
 		
 		//draw border for thermal camera visualization
 		//main swoop left and right 22x30, 6x33
+		
 		tft.fillRoundRect(6, 6, 22, 30, 11, color_SWOOP);
 		tft.fillRoundRect(6, 204, 22, 30, 11, color_SWOOP);
 				
@@ -1771,10 +1772,10 @@ void ToggleThermal() {
 		tft.fillRoundRect(292, 204, 22, 30, 11, color_SWOOP);
 		
 		tft.fillRect(302, 14, 12, 22, color_SWOOP);
-		tft.fillRect(302, 204, 22, 22, color_SWOOP);
+		tft.fillRect(302, 204, 12, 22, color_SWOOP);
 		
-		tft.fillRoundRect(18, 9, 12, 27, 6, ST77XX_BLACK);
-		tft.fillRoundRect(18, 204, 12, 27, 6, ST77XX_BLACK);
+		tft.fillRoundRect(18, 9, 12, 32, 6, ST77XX_BLACK);
+		tft.fillRoundRect(18, 199, 12, 32, 6, ST77XX_BLACK);
 		
 		tft.fillRect(16, 6, 14, 3, color_SWOOP);
 		tft.fillRect(290, 6, 16, 3, color_SWOOP);
@@ -1787,8 +1788,8 @@ void ToggleThermal() {
 		tft.fillRect(302, 36, 6, 33, color_SWOOP);
 		tft.fillRect(302, 171, 6, 33, color_SWOOP);
 		
-		tft.fillRoundRect(282, 9, 20, 27, 6, ST77XX_BLACK);
-		tft.fillRoundRect(282, 204, 20, 27, 6, ST77XX_BLACK);
+		tft.fillRoundRect(282, 9, 20, 32, 6, ST77XX_BLACK);
+		tft.fillRoundRect(282, 199, 20, 32, 6, ST77XX_BLACK);
 		
 		//inner border middle
 		tft.fillRect(12, 71, 6, 48, color_LABELTEXT2);
@@ -1797,7 +1798,7 @@ void ToggleThermal() {
 		tft.fillRect(302, 121, 6, 48, color_LABELTEXT2);
 		
 		//use loop for all spectrum color edges
-		for (uint8_t j = 0; j < 8; j++) {
+		for (uint8_t j = 0; j < 7; j++) {
 			int nTempY = 38 + (j * 23);
 			//38, 61, 84, 107, 135, 158, 181
 			if (j > 3) {
@@ -1806,10 +1807,10 @@ void ToggleThermal() {
 			//draw both rectangles of same color, 1 for each side, since Y coord already calculated
 			tft.fillRect(6, nTempY, 4, (j == 3 ? 26 : 21), mnThermalCameraLabels[j]);
 			tft.fillRect(310, nTempY, 4, (j == 3 ? 26 : 21), mnThermalCameraLabels[j]);
-		}
-		
+		}		
 		
 	} else {		
+		mbThermalActive = false;
 		//oThermalCamera.setRefreshRate(MLX90640_0_5_HZ);
 		MLX90640_SetRefreshRate(mbCameraAddress, 0x01);
 		ResetWireClock();
@@ -1818,7 +1819,7 @@ void ToggleThermal() {
 }
 
 void RunThermal() {
-	if (!mbButton7Flag) return;	
+	if (!mbThermalActive) return;	
 	
 	if (!mbThermalCameraStarted) {
 		tft.fillRect(150, 80, 70, 40, ST77XX_BLACK);
