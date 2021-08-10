@@ -327,8 +327,11 @@ const uint16_t mnarrThermalDisplayColors[] = {0x480F, 0x400F,0x400F,0x400F,0x401
 bool mbTomServoActive = false;
 unsigned long mnButton2Press = 0;
 unsigned long mnButton3Press = 0;
-
-
+int mnServoButtonWindow = 1000;
+//graphs should take 3 seconds for full draw cycle-> 3000 / 80 lines
+uint8_t mnServoDrawInterval = 38;
+unsigned long mnServoLastDraw = 0;
+uint8_t mnCurrentServoGraphPoint = 0;
 
 //to-do:
 //left side led stacking mode for countdown to color scanner action
@@ -780,6 +783,8 @@ void GoHome() {
 	mbHomeActive = true;
 	mbRGBActive = false;
 	mbTempActive = false;
+	mnCurrentServoGraphPoint = 0;
+	mnServoLastDraw = 0;
 	
 	mbButton1Flag = false;
 	mbButton2Flag = false;
@@ -796,6 +801,7 @@ void GoHome() {
 	mbTempBarComplete = false;
 	mbBaromBarComplete = false;
 	mbThermalActive = false;
+	mbTomServoActive = false;
 
 	//tft.setFont(&lcars11pt7b);
 	tft.setFont(&lcars15pt7b);
@@ -1030,6 +1036,14 @@ void ToggleRGBSensor() {
 	ResetWireClock();
 	
 	//set timestamp of button press and check if this activates tomservo
+	mnButton2Press = millis();
+	mnCurrentServoGraphPoint = 0;
+	mnServoLastDraw = 0;
+	int nTomServoButtonDifference = mnButton2Press - mnButton3Press;
+	if (abs(nTomServoButtonDifference) < mnServoButtonWindow) {
+		mbTomServoActive = true;
+		ActivateTomServo();
+	}
 	
 	mbButton2Flag = !mbButton2Flag;
 	//reset any temperature app values
@@ -1295,6 +1309,8 @@ void ToggleClimateSensor() {
 	mbHomeActive = false;
 	mbThermalActive = false;
 	mbTomServoActive = false;
+	mnCurrentServoGraphPoint = 0;
+	mnServoLastDraw = 0;
 	
 	if (mbButton1Flag) {		
 		if (!mbTempActive) {
@@ -1498,6 +1514,15 @@ void ToggleMicrophone() {
 	ResetWireClock();
 	
 	//set timestamp of button press and check if this activates tomservo
+	mnButton3Press = millis();
+	mnCurrentServoGraphPoint = 0;
+	mnServoLastDraw = 0;
+	//if the 2nd and 3rd buttons are pressed within 1 second of each other, go tom servo
+	int nTomServoButtonDifference = mnButton2Press - mnButton3Press;
+	if (abs(nTomServoButtonDifference) < mnServoButtonWindow) {		
+		mbTomServoActive = true;
+		ActivateTomServo();
+	}
 	
 	mbButton3Flag = !mbButton3Flag;
 	//reset any rgb sensor values
@@ -1518,6 +1543,8 @@ void ToggleMicrophone() {
 	mbTempBarComplete = false;
 	mbBaromBarComplete = false;
 	mbTomServoActive = false;
+	mnCurrentServoGraphPoint = 0;
+	mnServoLastDraw = 0;
 	
 	if (mbButton3Flag) {
 		DisableSound();
@@ -1752,7 +1779,10 @@ void ToggleThermal() {
 		mbRGBActive = false;
 		mbThermalActive = true;
 		mbMicrophoneActive = false;
-		mbTempActive = false;
+		mbTempActive = false;		
+		mnCurrentServoGraphPoint = 0;
+		mnServoLastDraw = 0;
+		
 		//camera data refresh rate needs to be twice as high as expected display frame rate
 		//oThermalCamera.setRefreshRate(MLX90640_4_HZ);
 		SetThermalClock();
@@ -2362,9 +2392,74 @@ void ActivateTomServo() {
 	tft.fillTriangle(259, 218, 259, 237, 254, 237, ST77XX_WHITE);
 	tft.fillTriangle(286, 218, 286, 237, 291, 237, ST77XX_WHITE);
 	
+	mnCurrentServoGraphPoint = 0;
+	mnServoLastDraw = 0;
 }
 
 void RunTomServo() {
 	if (!mbTomServoActive) return;	
+	
+	if (millis() - mnServoLastDraw < mnServoDrawInterval) return;
+	
+	//establish graph values
+	const uint8_t narrGraphData[] = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,
+			1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20};
+	const uint8_t nYBase1 = 98;	
+	const uint8_t nYBase2 = 158;
+	const uint8_t nYBase3 = 219;
+	const uint8_t nYBase4 = 98;
+	const uint8_t nXBaseL = 102;
+	const uint8_t nXBaseR = 221;
+	uint8_t nPreviousServoGraphPoint = 0;
+	uint8_t nPreviousServoGraphPoint2 = 0;
+	uint8_t nPreviousServoGraphPoint4 = 0;
+	uint8_t nPreviousServoGraphPoint8 = 0;
+	nPreviousServoGraphPoint = mnCurrentServoGraphPoint == 0 ? 79 : (mnCurrentServoGraphPoint - 1);
+	nPreviousServoGraphPoint2 = (mnCurrentServoGraphPoint - 2) < 0 ? 78 : (mnCurrentServoGraphPoint - 2);
+	nPreviousServoGraphPoint4 = (mnCurrentServoGraphPoint - 4) < 0 ? 76 : (mnCurrentServoGraphPoint - 4);
+	nPreviousServoGraphPoint8 = (mnCurrentServoGraphPoint - 8) < 0 ? 72 : (mnCurrentServoGraphPoint - 8);
+	//colors in use: 1 => swoop, 2 => labeltext2, 3 => labeltext3, 4 => labeltext4
+	
+	//redraw previous line as graph color if this is not first draw action
+	if (mnServoLastDraw > 0) {
+		tft.drawFastVLine((nXBaseL + nPreviousServoGraphPoint), (nYBase1 - narrGraphData[nPreviousServoGraphPoint]), (narrGraphData[nPreviousServoGraphPoint] * 2), color_SWOOP); 
+	}
+		
+	//draw current single line graph data point
+	tft.drawFastVLine((nXBaseL + mnCurrentServoGraphPoint), (nYBase1 - narrGraphData[mnCurrentServoGraphPoint]), (narrGraphData[mnCurrentServoGraphPoint] * 2), ST77XX_WHITE); 
+	
+	//graph 2, 3, 4 all use same data at different speeds
+	//graph on right side - #4
+	if (mnCurrentServoGraphPoint % 2 == 0) {
+		if (mnServoLastDraw > 0) {
+			tft.fillRect(nXBaseR + nPreviousServoGraphPoint2, (nYBase1 - narrGraphData[nPreviousServoGraphPoint2]), 2, (narrGraphData[nPreviousServoGraphPoint2] * 2), color_LABELTEXT4);
+		}
+		tft.fillRect(nXBaseR + mnCurrentServoGraphPoint, (nYBase1 - narrGraphData[mnCurrentServoGraphPoint]), 2, (narrGraphData[mnCurrentServoGraphPoint] * 2), ST77XX_WHITE);
+		
+		//graph on middle left - #2
+		if (mnCurrentServoGraphPoint % 4 == 0) {
+			if (mnServoLastDraw > 0) {
+				tft.fillRect(nXBaseL + nPreviousServoGraphPoint4, (nYBase1 - narrGraphData[nPreviousServoGraphPoint4]), 4, (narrGraphData[nPreviousServoGraphPoint4] * 2), color_LABELTEXT2);
+			}
+			tft.fillRect(nXBaseL + mnCurrentServoGraphPoint, (nYBase1 - narrGraphData[mnCurrentServoGraphPoint]), 4, (narrGraphData[mnCurrentServoGraphPoint] * 2), ST77XX_WHITE);
+		
+			//graph on bottom left - #3
+			if (mnCurrentServoGraphPoint % 8 == 0) {
+				if (mnServoLastDraw > 0) {
+					tft.fillRect(nXBaseR + nPreviousServoGraphPoint8, (nYBase1 - narrGraphData[nPreviousServoGraphPoint8]), 8, (narrGraphData[nPreviousServoGraphPoint8] * 2), color_LABELTEXT3);
+				}
+				tft.fillRect(nXBaseR + mnCurrentServoGraphPoint, (nYBase1 - narrGraphData[mnCurrentServoGraphPoint]), 8, (narrGraphData[mnCurrentServoGraphPoint] * 2), ST77XX_WHITE);		
+			}
+		}
+	}	
+	
+	++mnCurrentServoGraphPoint;
+	if (mnCurrentServoGraphPoint > 79) mnCurrentServoGraphPoint = 0;
+	mnServoLastDraw = millis();
 	//animate 4 trash graphs	
+	//left 80x39, 1 wide > 4 wide > 8 wide
+	//right 94x39, bars 2 wide
+	//cycle "white" bar from left to right. at last column, re-color end column and start over at 0
+	//1 loop for ALL graph drawings, with 30fps as throttle to allow button polling
+	//each iteration of loop has separate timer triggers due to bar widths
 }
