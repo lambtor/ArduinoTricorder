@@ -1037,13 +1037,15 @@ void ToggleRGBSensor() {
 	
 	//set timestamp of button press and check if this activates tomservo
 	mnButton2Press = millis();
-	mnCurrentServoGraphPoint = 0;
-	mnServoLastDraw = 0;
 	int nTomServoButtonDifference = mnButton2Press - mnButton3Press;
 	if (abs(nTomServoButtonDifference) < mnServoButtonWindow) {
 		mbTomServoActive = true;
+		DisableSound();
 		ActivateTomServo();
+		return;
 	}
+	mnCurrentServoGraphPoint = 0;
+	mnServoLastDraw = 0;
 	
 	mbButton2Flag = !mbButton2Flag;
 	//reset any temperature app values
@@ -1515,14 +1517,16 @@ void ToggleMicrophone() {
 	
 	//set timestamp of button press and check if this activates tomservo
 	mnButton3Press = millis();
-	mnCurrentServoGraphPoint = 0;
-	mnServoLastDraw = 0;
 	//if the 2nd and 3rd buttons are pressed within 1 second of each other, go tom servo
 	int nTomServoButtonDifference = mnButton2Press - mnButton3Press;
 	if (abs(nTomServoButtonDifference) < mnServoButtonWindow) {		
 		mbTomServoActive = true;
+		DisableSound();
 		ActivateTomServo();
+		return;
 	}
+	mnCurrentServoGraphPoint = 0;
+	mnServoLastDraw = 0;
 	
 	mbButton3Flag = !mbButton3Flag;
 	//reset any rgb sensor values
@@ -2346,7 +2350,7 @@ void ActivateTomServo() {
 	
 	//use big text size for [BIO   SCAN] and SERVO
 	tft.setFont(&lcars15pt7b);
-	drawParamText(225, 43, "[BIO   SCAN]", ST77XX_WHITE);
+	drawParamText(220, 43, "[BIO   SCAN]", ST77XX_WHITE);
 		
 	tft.setFont(&lcars11pt7b);
 	drawParamText(9, 204, "SERVO", ST77XX_BLACK);
@@ -2365,8 +2369,8 @@ void ActivateTomServo() {
 	drawTinyInt(205, 70, 1100, ST77XX_BLACK, color_SERVOPURPLE);
 	drawTinyInt(203, 130, 1200, ST77XX_BLACK, color_SERVOPURPLE);
 	
-	drawTinyInt(127, 5, 1200, ST77XX_BLACK, color_HEADER);
-	drawTinyInt(150, 5, 1000, ST77XX_BLACK, color_HEADER);
+	drawTinyInt(127, 6, 1200, ST77XX_BLACK, color_HEADER);
+	drawTinyInt(150, 6, 1000, ST77XX_BLACK, color_HEADER);
 	//tft.fillRoundRect(122, 25, 14, 11, 5, color_MAINTEXT);
 	
 	//actual robot drawing
@@ -2423,7 +2427,7 @@ void RunTomServo() {
 	
 	//redraw previous line as graph color if this is not first draw action
 	if (mnServoLastDraw > 0) {
-		tft.drawFastVLine((nXBaseL + nPreviousServoGraphPoint), (nYBase1 - narrGraphData[nPreviousServoGraphPoint]), (narrGraphData[nPreviousServoGraphPoint] * 2), color_SWOOP); 
+		tft.drawFastVLine((nXBaseL + nPreviousServoGraphPoint), (nYBase1 - narrGraphData[nPreviousServoGraphPoint]), (narrGraphData[nPreviousServoGraphPoint] * 2), color_LABELTEXT); 
 	}
 		
 	//draw current single line graph data point
@@ -2433,23 +2437,23 @@ void RunTomServo() {
 	//graph on right side - #4
 	if (mnCurrentServoGraphPoint % 2 == 0) {
 		if (mnServoLastDraw > 0) {
-			tft.fillRect(nXBaseR + nPreviousServoGraphPoint2, (nYBase1 - narrGraphData[nPreviousServoGraphPoint2]), 2, (narrGraphData[nPreviousServoGraphPoint2] * 2), color_LABELTEXT4);
+			tft.fillRect(nXBaseR + nPreviousServoGraphPoint2, (nYBase4 - narrGraphData[nPreviousServoGraphPoint2]), 2, (narrGraphData[nPreviousServoGraphPoint2] * 2), color_LABELTEXT4);
 		}
-		tft.fillRect(nXBaseR + mnCurrentServoGraphPoint, (nYBase1 - narrGraphData[mnCurrentServoGraphPoint]), 2, (narrGraphData[mnCurrentServoGraphPoint] * 2), ST77XX_WHITE);
+		tft.fillRect(nXBaseR + mnCurrentServoGraphPoint, (nYBase4 - narrGraphData[mnCurrentServoGraphPoint]), 2, (narrGraphData[mnCurrentServoGraphPoint] * 2), ST77XX_WHITE);
 		
 		//graph on middle left - #2
 		if (mnCurrentServoGraphPoint % 4 == 0) {
 			if (mnServoLastDraw > 0) {
-				tft.fillRect(nXBaseL + nPreviousServoGraphPoint4, (nYBase1 - narrGraphData[nPreviousServoGraphPoint4]), 4, (narrGraphData[nPreviousServoGraphPoint4] * 2), color_LABELTEXT2);
+				tft.fillRect(nXBaseL + nPreviousServoGraphPoint4, (nYBase2 - narrGraphData[nPreviousServoGraphPoint4]), 4, (narrGraphData[nPreviousServoGraphPoint4] * 2), color_LABELTEXT2);
 			}
-			tft.fillRect(nXBaseL + mnCurrentServoGraphPoint, (nYBase1 - narrGraphData[mnCurrentServoGraphPoint]), 4, (narrGraphData[mnCurrentServoGraphPoint] * 2), ST77XX_WHITE);
+			tft.fillRect(nXBaseL + mnCurrentServoGraphPoint, (nYBase2 - narrGraphData[mnCurrentServoGraphPoint]), 4, (narrGraphData[mnCurrentServoGraphPoint] * 2), ST77XX_WHITE);
 		
 			//graph on bottom left - #3
 			if (mnCurrentServoGraphPoint % 8 == 0) {
 				if (mnServoLastDraw > 0) {
-					tft.fillRect(nXBaseR + nPreviousServoGraphPoint8, (nYBase1 - narrGraphData[nPreviousServoGraphPoint8]), 8, (narrGraphData[nPreviousServoGraphPoint8] * 2), color_LABELTEXT3);
+					tft.fillRect(nXBaseL + nPreviousServoGraphPoint8, (nYBase3 - narrGraphData[nPreviousServoGraphPoint8]), 8, (narrGraphData[nPreviousServoGraphPoint8] * 2), color_LABELTEXT3);
 				}
-				tft.fillRect(nXBaseR + mnCurrentServoGraphPoint, (nYBase1 - narrGraphData[mnCurrentServoGraphPoint]), 8, (narrGraphData[mnCurrentServoGraphPoint] * 2), ST77XX_WHITE);		
+				tft.fillRect(nXBaseL + mnCurrentServoGraphPoint, (nYBase3 - narrGraphData[mnCurrentServoGraphPoint]), 8, (narrGraphData[mnCurrentServoGraphPoint] * 2), ST77XX_WHITE);		
 			}
 		}
 	}	
