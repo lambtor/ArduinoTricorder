@@ -40,15 +40,13 @@
 
 //buttons, scroller	- d2 pin supposed to be pin #2
 //button on the board is connected to pin 7.  TX is pin 0, RX is pin 1 - these are normally used for serial communication
-//#define PIN_D2						PIN_NFC2
-//need to modify your system_nrf52.c file to have the following line:
-//#define CONFIG_NFCT_PINS_AS_GPIOS (1)
-//YOU WILL SEE THIS IN THAT FILE, with conditional logic around it to actually free up the NFC pins.
 
 #define BUTTON_1_PIN				PIN_SERIAL1_RX
 #define BUTTON_2_PIN				PIN_SERIAL1_TX
-//adafruit defines pin D2 as pin 2 in its header file, but it does not respond when set as an input
-//per the datasheet, NFC2 may actually be pin 54 or J24 ??? maybe this will work after restoring bootloader to default via double tap on reset button
+//adafruit defines pin D2 as pin 2 in its header file, but it does not respond when set as an input by default.
+//you will need to modify system_nrf52840.c file by adding
+//#define CONFIG_NFCT_PINS_AS_GPIOS (1)
+//YOU WILL SEE THIS CONSTANT IN THAT FILE, with conditional logic around it to actually free up the NFC pins, but only if that constant exists in that file
 #define BUTTON_3_PIN				(2)
 
 //pin 7 is the board button
@@ -74,11 +72,9 @@
 //#define BOARD_BLUELED_PIN 		4
 //#define LED_RED 							13
 //#define LED_BLUE						4
-//#define PIN_SERIAL1_RX       (1)
-//#define PIN_SERIAL1_TX       (0)
 
 //system os version #. max 3 digits
-#define DEVICE_VERSION			"0.88"
+#define DEVICE_VERSION			"0.89"
 
 // TNG colors here
 #define color_SWOOP				0xF7B3
@@ -333,9 +329,11 @@ uint8_t mnServoDrawInterval = 38;
 unsigned long mnServoLastDraw = 0;
 uint8_t mnCurrentServoGraphPoint = 0;
 
-//to-do:
-//left side led stacking mode for countdown to color scanner action
-//tom servo screen creation with canned animation using trigger mapped to met / bio buttons pressed simultaneously
+//establish graph values
+const uint8_t mnarrServoGraphData[] = {3,7,10,12,13,14,14,14,13,12,10,7,4,4,6,8,11,13,14,15,15,15,15,14,13,
+									12,10,8,7,6,4,3,2,2,2,3,4,6,8,9,11,12,12,12,11,10,9,7,5,3,3,3,5,7,10,
+									11,11,12,12,12,11,11,10,9,9,9,8,8,8,8,7,6,5,5,5,5,4,3,2,2,2};
+
 
 void setup() {
 	//NRF_UICR->NFCPINS = 0;
@@ -524,9 +522,6 @@ void SleepMode() {
 	//need wired pin to set backlight low here
 	//digitalWrite(DISPLAY_BACKLIGHT_PIN, LOW);
 	tft.enableSleep(true);
-	//tft.enableDisplay(false);	
-	//void sleep(void) { tft.sendCommand(ST77XX_SLPIN); }
-	//void wake(void) { tft.sendCommand(ST77XX_SLPOUT); }
 	
 	//set sound trigger pin HIGH, as low causes playback
 	digitalWrite(SOUND_TRIGGER_PIN, HIGH);
@@ -597,9 +592,9 @@ void RunNeoPixelColor(int nPin) {
 			//ledPwrStrip.show();
 		}
 		
-		//need to poll ID LED separate from power, as PWR only updates every 30 seconds
+		//need to push ID LED separate from power, as PWR only updates every 30 seconds
 		if (mnLastUpdateIDLED == 0 || ((lTimer - mnLastUpdateIDLED) > mnIDLEDInterval)) {
-			//set ID LED color based on value pulled from A1, middle prong of scroll potentiometer
+			//set ID LED color based on value pulled from A0, middle prong of scroll potentiometer
 			//colors range is purple > blue > green > yellow > orange > red > pink > white
 			uint16_t nScrollerValue = analogRead(PIN_SCROLL_INPUT);
 			uint16_t nTempColor = nScrollerValue;
@@ -1065,7 +1060,6 @@ void ToggleRGBSensor() {
 	mbTomServoActive = false;
 	
 	if (mbButton2Flag) {		
-		//to-do: if sensor disabled or not started, pulse message to display
 		if (!mbColorInitialized) {
 			if (millis() - mnLastRGBScan > mnRGBScanInterval) {
 				tft.fillScreen(ST77XX_BLACK);
@@ -1791,7 +1785,7 @@ void ToggleThermal() {
 		//oThermalCamera.setRefreshRate(MLX90640_4_HZ);
 		SetThermalClock();
 		MLX90640_SetRefreshRate(mbCameraAddress, 0x04);
-		ActivateSound();
+		DisableSound();
 		
 		//draw border for thermal camera visualization
 		//main swoop left and right 22x30, 6x33
@@ -2361,7 +2355,6 @@ void ActivateTomServo() {
 	//repeat to yourself it's just a show
 	drawParamText(70, 35, "REPEAT TO YOURSELF", color_LABELTEXT);
 	drawParamText(70, 54, "IT'S JUST A SHOW", color_LABELTEXT);
-	//drawParamText(147, 36, "IT'S JUST A SHOW", color_MAINTEXT);
 	
 	drawTinyInt(86, 70, 800, ST77XX_BLACK, color_SERVOPURPLE);
 	drawTinyInt(86, 130, 900, ST77XX_BLACK, color_SERVOPURPLE);
@@ -2371,7 +2364,6 @@ void ActivateTomServo() {
 	
 	drawTinyInt(127, 6, 1200, ST77XX_BLACK, color_HEADER);
 	drawTinyInt(150, 6, 1000, ST77XX_BLACK, color_HEADER);
-	//tft.fillRoundRect(122, 25, 14, 11, 5, color_MAINTEXT);
 	
 	//actual robot drawing
 	tft.fillCircle(273, 154, 11, ST77XX_WHITE);	
@@ -2396,6 +2388,13 @@ void ActivateTomServo() {
 	tft.fillTriangle(259, 218, 259, 237, 254, 237, ST77XX_WHITE);
 	tft.fillTriangle(286, 218, 286, 237, 291, 237, ST77XX_WHITE);
 	
+	//baseline for each graph
+	tft.drawFastHLine(102, 98, 80, color_LABELTEXT);
+	tft.drawFastHLine(102, 158, 80, color_LABELTEXT2);
+	tft.drawFastHLine(102, 219, 80, color_LABELTEXT3);
+	//right side graph is 94 wide
+	tft.drawFastHLine(221, 98, 94, color_LABELTEXT4);
+	
 	mnCurrentServoGraphPoint = 0;
 	mnServoLastDraw = 0;
 }
@@ -2403,12 +2402,9 @@ void ActivateTomServo() {
 void RunTomServo() {
 	if (!mbTomServoActive) return;	
 	
+	//use main arduino loop for ALL graph drawings, with delay enforcer (3000ms / 80) as throttle to allow button polling
 	if (millis() - mnServoLastDraw < mnServoDrawInterval) return;
-	
-	//establish graph values
-	const uint8_t narrGraphData[] = {3,7,10,12,13,14,14,14,13,12,10,7,4,4,6,8,11,13,14,15,15,15,15,14,13,
-									12,10,8,7,6,4,3,2,2,2,3,4,6,8,9,11,12,12,12,11,10,9,7,5,3,3,3,5,7,10,
-									11,11,12,12,12,11,11,10,9,9,9,8,8,8,8,7,6,5,5,5,5,4,3,2,2,2};
+		
 	const uint8_t nYBase1 = 98;	
 	const uint8_t nYBase2 = 158;
 	const uint8_t nYBase3 = 219;
@@ -2423,48 +2419,49 @@ void RunTomServo() {
 	nPreviousServoGraphPoint2 = (mnCurrentServoGraphPoint - 2) < 0 ? 78 : (mnCurrentServoGraphPoint - 2);
 	nPreviousServoGraphPoint4 = (mnCurrentServoGraphPoint - 4) < 0 ? 76 : (mnCurrentServoGraphPoint - 4);
 	nPreviousServoGraphPoint8 = (mnCurrentServoGraphPoint - 8) < 0 ? 72 : (mnCurrentServoGraphPoint - 8);
-	//colors in use: 1 => swoop, 2 => labeltext2, 3 => labeltext3, 4 => labeltext4
+	//colors in use: 1 => labeltext, 2 => labeltext2, 3 => labeltext3, 4 => labeltext4
+	
+	//animate 4 trash graphs	
+	//left 80x39, 1 wide > 4 wide > 8 wide
+	//right 94x39, bars 2 wide
+	//cycle "white" bar from left to right. at last column, start over at 0	
+	//each graph update is in its own if-statement, but many of the graph sizes have to handle shared situations
+	//every even graph point needs to redraw single-line and 2-line graph, and potentially cause an update for 4-line and 8-line as well
 	
 	//redraw previous line as graph color if this is not first draw action
 	if (mnServoLastDraw > 0) {
-		tft.drawFastVLine((nXBaseL + nPreviousServoGraphPoint), (nYBase1 - narrGraphData[nPreviousServoGraphPoint]), (narrGraphData[nPreviousServoGraphPoint] * 2), color_LABELTEXT); 
+		tft.drawFastVLine((nXBaseL + nPreviousServoGraphPoint), (nYBase1 - mnarrServoGraphData[nPreviousServoGraphPoint]), (mnarrServoGraphData[nPreviousServoGraphPoint] * 2), color_LABELTEXT); 
 	}
 		
 	//draw current single line graph data point
-	tft.drawFastVLine((nXBaseL + mnCurrentServoGraphPoint), (nYBase1 - narrGraphData[mnCurrentServoGraphPoint]), (narrGraphData[mnCurrentServoGraphPoint] * 2), ST77XX_WHITE); 
+	tft.drawFastVLine((nXBaseL + mnCurrentServoGraphPoint), (nYBase1 - mnarrServoGraphData[mnCurrentServoGraphPoint]), (mnarrServoGraphData[mnCurrentServoGraphPoint] * 2), ST77XX_WHITE); 
 	
 	//graph 2, 3, 4 all use same data at different speeds
 	//graph on right side - #4
 	if (mnCurrentServoGraphPoint % 2 == 0) {
 		if (mnServoLastDraw > 0) {
-			tft.fillRect(nXBaseR + nPreviousServoGraphPoint2, (nYBase4 - narrGraphData[nPreviousServoGraphPoint2]), 2, (narrGraphData[nPreviousServoGraphPoint2] * 2), color_LABELTEXT4);
+			tft.fillRect(nXBaseR + nPreviousServoGraphPoint2, (nYBase4 - mnarrServoGraphData[nPreviousServoGraphPoint2]), 2, (mnarrServoGraphData[nPreviousServoGraphPoint2] * 2), color_LABELTEXT4);
 		}
-		tft.fillRect(nXBaseR + mnCurrentServoGraphPoint, (nYBase4 - narrGraphData[mnCurrentServoGraphPoint]), 2, (narrGraphData[mnCurrentServoGraphPoint] * 2), ST77XX_WHITE);
+		tft.fillRect(nXBaseR + mnCurrentServoGraphPoint, (nYBase4 - mnarrServoGraphData[mnCurrentServoGraphPoint]), 2, (mnarrServoGraphData[mnCurrentServoGraphPoint] * 2), ST77XX_WHITE);
 		
 		//graph on middle left - #2
 		if (mnCurrentServoGraphPoint % 4 == 0) {
 			if (mnServoLastDraw > 0) {
-				tft.fillRect(nXBaseL + nPreviousServoGraphPoint4, (nYBase2 - narrGraphData[nPreviousServoGraphPoint4]), 4, (narrGraphData[nPreviousServoGraphPoint4] * 2), color_LABELTEXT2);
+				tft.fillRect(nXBaseL + nPreviousServoGraphPoint4, (nYBase2 - mnarrServoGraphData[nPreviousServoGraphPoint4]), 4, (mnarrServoGraphData[nPreviousServoGraphPoint4] * 2), color_LABELTEXT2);
 			}
-			tft.fillRect(nXBaseL + mnCurrentServoGraphPoint, (nYBase2 - narrGraphData[mnCurrentServoGraphPoint]), 4, (narrGraphData[mnCurrentServoGraphPoint] * 2), ST77XX_WHITE);
+			tft.fillRect(nXBaseL + mnCurrentServoGraphPoint, (nYBase2 - mnarrServoGraphData[mnCurrentServoGraphPoint]), 4, (mnarrServoGraphData[mnCurrentServoGraphPoint] * 2), ST77XX_WHITE);
 		
 			//graph on bottom left - #3
 			if (mnCurrentServoGraphPoint % 8 == 0) {
 				if (mnServoLastDraw > 0) {
-					tft.fillRect(nXBaseL + nPreviousServoGraphPoint8, (nYBase3 - narrGraphData[nPreviousServoGraphPoint8]), 8, (narrGraphData[nPreviousServoGraphPoint8] * 2), color_LABELTEXT3);
+					tft.fillRect(nXBaseL + nPreviousServoGraphPoint8, (nYBase3 - mnarrServoGraphData[nPreviousServoGraphPoint8]), 8, (mnarrServoGraphData[nPreviousServoGraphPoint8] * 2), color_LABELTEXT3);
 				}
-				tft.fillRect(nXBaseL + mnCurrentServoGraphPoint, (nYBase3 - narrGraphData[mnCurrentServoGraphPoint]), 8, (narrGraphData[mnCurrentServoGraphPoint] * 2), ST77XX_WHITE);		
+				tft.fillRect(nXBaseL + mnCurrentServoGraphPoint, (nYBase3 - mnarrServoGraphData[mnCurrentServoGraphPoint]), 8, (mnarrServoGraphData[mnCurrentServoGraphPoint] * 2), ST77XX_WHITE);		
 			}
 		}
 	}	
 	
 	++mnCurrentServoGraphPoint;
 	if (mnCurrentServoGraphPoint > 79) mnCurrentServoGraphPoint = 0;
-	mnServoLastDraw = millis();
-	//animate 4 trash graphs	
-	//left 80x39, 1 wide > 4 wide > 8 wide
-	//right 94x39, bars 2 wide
-	//cycle "white" bar from left to right. at last column, re-color end column and start over at 0
-	//1 loop for ALL graph drawings, with 30fps as throttle to allow button polling
-	//each iteration of loop has separate timer triggers due to bar widths
+	mnServoLastDraw = millis();	
 }
