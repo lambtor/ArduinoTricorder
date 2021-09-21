@@ -334,7 +334,6 @@ const uint8_t mnarrServoGraphData[] = {3,7,10,12,13,14,14,14,13,12,10,7,4,4,6,8,
 									12,10,8,7,6,4,3,2,2,2,3,4,6,8,9,11,12,12,12,11,10,9,7,5,3,3,3,5,7,10,
 									11,11,12,12,12,11,11,10,9,9,9,8,8,8,8,7,6,5,5,5,5,4,3,2,2,2};
 
-
 void setup() {
 	//NRF_UICR->NFCPINS = 0;
 	ledPwrStrip.begin();
@@ -621,7 +620,9 @@ void RunNeoPixelColor(int nPin) {
 			mnCurrentProfileRed = ((((mnIDLEDColorscape[nTempColor] >> 11) & 0x1F) * 527) + 23) >> 6;
 			mnCurrentProfileGreen = ((((mnIDLEDColorscape[nTempColor] >> 5) & 0x3F) * 259) + 33) >> 6;
 			mnCurrentProfileBlue = (((mnIDLEDColorscape[nTempColor] & 0x1F) * 527) + 23) >> 6;
-			ledPwrStrip.setPixelColor(1, mnCurrentProfileRed, mnCurrentProfileGreen, mnCurrentProfileBlue);
+			//NEOPIXEL_LED_COUNT
+			//ledPwrStrip.setPixelColor(1, mnCurrentProfileRed, mnCurrentProfileGreen, mnCurrentProfileBlue);
+			ledPwrStrip.setPixelColor(NEOPIXEL_LED_COUNT-2, mnCurrentProfileRed, mnCurrentProfileGreen, mnCurrentProfileBlue);
 			
 			ledPwrStrip.show();
 			mnLastUpdateIDLED = lTimer;
@@ -640,8 +641,9 @@ void RunNeoPixelColor(int nPin) {
 				nCurrentEMRG == mnEMRGMaxStrength;
 			if (nCurrentEMRG < mnEMRGMinStrength)
 				nCurrentEMRG == mnEMRGMinStrength;
-			mnEMRGCurrentStrength = nCurrentEMRG;
-			ledPwrStrip.setPixelColor(2, nCurrentEMRG, 0, 0);
+			mnEMRGCurrentStrength = nCurrentEMRG;			
+			//ledPwrStrip.setPixelColor(2, nCurrentEMRG, 0, 0);
+			ledPwrStrip.setPixelColor(NEOPIXEL_LED_COUNT-1, nCurrentEMRG, 0, 0);
 			ledPwrStrip.show();
 			mnLastUpdateEMRG = lTimer;
 		}		
@@ -677,6 +679,43 @@ void RunNeoPixelColor(int nPin) {
 			//color scanner app running - do nothing
 		}
 	}
+}
+
+void SetActiveNeoPixelButton(int nButtonID) {
+	if (NEOPIXEL_LED_COUNT != 6) return;
+	switch (nButtonID) {
+		//home screen, NO APPS ACTIVE
+		case 0: ledPwrStrip.setPixelColor(NEOPIXEL_LED_COUNT-5, 0, 128, 0);
+				ledPwrStrip.setPixelColor(NEOPIXEL_LED_COUNT-4, 0, 128, 0);
+				ledPwrStrip.setPixelColor(NEOPIXEL_LED_COUNT-3, 0, 128, 0);
+				break;
+		//GEO
+		case 1: ledPwrStrip.setPixelColor(NEOPIXEL_LED_COUNT-5, 112, 128, 0);
+				ledPwrStrip.setPixelColor(NEOPIXEL_LED_COUNT-4, 0, 128, 0);
+				ledPwrStrip.setPixelColor(NEOPIXEL_LED_COUNT-3, 0, 128, 0);
+				break;
+		//MET
+		case 2: ledPwrStrip.setPixelColor(NEOPIXEL_LED_COUNT-5, 0, 128, 0);
+				ledPwrStrip.setPixelColor(NEOPIXEL_LED_COUNT-4, 112, 128, 0);
+				ledPwrStrip.setPixelColor(NEOPIXEL_LED_COUNT-3, 0, 128, 0);
+				break;
+		//BIO
+		case 3: ledPwrStrip.setPixelColor(NEOPIXEL_LED_COUNT-5, 0, 128, 0);
+				ledPwrStrip.setPixelColor(NEOPIXEL_LED_COUNT-4, 0, 128, 0);
+				ledPwrStrip.setPixelColor(NEOPIXEL_LED_COUNT-3, 112, 128, 0);
+				break;
+		//CAMERA - all RED
+		case 4: ledPwrStrip.setPixelColor(NEOPIXEL_LED_COUNT-5, 128, 0, 0);
+				ledPwrStrip.setPixelColor(NEOPIXEL_LED_COUNT-4, 128, 0, 0);
+				ledPwrStrip.setPixelColor(NEOPIXEL_LED_COUNT-3, 128, 0, 0);
+				break;
+		//TOM SERVO - all BLUE? PURPLE?
+		case 5: ledPwrStrip.setPixelColor(NEOPIXEL_LED_COUNT-5, 0, 0, 128);
+				ledPwrStrip.setPixelColor(NEOPIXEL_LED_COUNT-4, 0, 0, 128);
+				ledPwrStrip.setPixelColor(NEOPIXEL_LED_COUNT-3, 0, 0, 128);
+				break;
+	}
+	ledPwrStrip.show();
 }
 
 void RunBoardLEDs() {
@@ -780,6 +819,7 @@ void GoHome() {
 	mbTempActive = false;
 	mnCurrentServoGraphPoint = 0;
 	mnServoLastDraw = 0;
+	SetActiveNeoPixelButton(0);
 	
 	mbButton1Flag = false;
 	mbButton2Flag = false;
@@ -1059,7 +1099,8 @@ void ToggleRGBSensor() {
 	mbBaromBarComplete = false;
 	mbTomServoActive = false;
 	
-	if (mbButton2Flag) {		
+	if (mbButton2Flag) {
+		
 		if (!mbColorInitialized) {
 			if (millis() - mnLastRGBScan > mnRGBScanInterval) {
 				tft.fillScreen(ST77XX_BLACK);
@@ -1071,6 +1112,7 @@ void ToggleRGBSensor() {
 		}
 		
 		if (!mbRGBActive) {
+			SetActiveNeoPixelButton(2);
 			ActivateSound();
 			mbRGBActive = true;
 			//load rgb scanner screen - this is done once to improve perf
@@ -1310,6 +1352,7 @@ void ToggleClimateSensor() {
 	
 	if (mbButton1Flag) {		
 		if (!mbTempActive) {
+			SetActiveNeoPixelButton(1);
 			ActivateSound();
 			mbTempActive = true;
 			//load temp scanner screen - this is done once to improve perf
@@ -1546,6 +1589,7 @@ void ToggleMicrophone() {
 	
 	if (mbButton3Flag) {
 		DisableSound();
+		SetActiveNeoPixelButton(3);
 		//show audio screen
 		//tft.fillScreen(0x6B6D);
 		tft.fillScreen(ST77XX_BLACK);
@@ -1771,6 +1815,7 @@ void ToggleThermal() {
 	}
 		
 	if (mbButton7Flag) {
+		SetActiveNeoPixelButton(4);
 		//Wire.beginTransmission(MLX90640_I2CADDR_DEFAULT);
 		tft.fillScreen(ST77XX_BLACK);
 		mbHomeActive = false;
@@ -2292,6 +2337,8 @@ void ActivateTomServo() {
 	mbButton1Flag = false;
 	mbButton2Flag = false;
 	mbButton3Flag = false;
+	
+	SetActiveNeoPixelButton(5);
 	
 	//reset any bar graph values from climate
 	mnTempTargetBar = 0;
