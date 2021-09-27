@@ -1,0 +1,7 @@
+﻿Designator	Footprint	Mid X	Mid Y	Ref X	Ref Y	Pad X	Pad Y	Layer	Rotation	Comment
+"BIO"	"SW-SMD_4P-L5.1-W5.1-P3.70-LS6.5-TL-2"	"35.5mm"	"83.3mm"	"35.5mm"	"83.3mm"	"32.2mm"	"85.15mm"	"T"	"0"	"SW-SMD_4P-L5.1-W5.1-P3.70-LS6.5-TL-2"
+"GEO"	"SW-SMD_4P-L5.1-W5.1-P3.70-LS6.5-TL-2"	"9.5mm"	"83.3mm"	"9.5mm"	"83.3mm"	"6.2mm"	"85.15mm"	"T"	"0"	"SW-SMD_4P-L5.1-W5.1-P3.70-LS6.5-TL-2"
+"LED1"	"LED-SMD_WS2812B-4020"	"9.5mm"	"90.75mm"	"9.5mm"	"90.75mm"	"8.23mm"	"90.75mm"	"T"	"180"	"LED-SMD_WS2812B-4020"
+"LED2"	"LED-SMD_WS2812B-4020"	"22.5mm"	"90.75mm"	"22.5mm"	"90.75mm"	"21.23mm"	"90.75mm"	"T"	"180"	"LED-SMD_WS2812B-4020"
+"LED3"	"LED-SMD_WS2812B-4020"	"35.5mm"	"90.75mm"	"35.5mm"	"90.75mm"	"34.22mm"	"90.75mm"	"T"	"180"	"LED-SMD_WS2812B-4020"
+"MET"	"SW-SMD_4P-L5.1-W5.1-P3.70-LS6.5-TL-2"	"22.5mm"	"83.3mm"	"22.5mm"	"83.3mm"	"19.2mm"	"85.15mm"	"T"	"0"	"SW-SMD_4P-L5.1-W5.1-P3.70-LS6.5-TL-2"
