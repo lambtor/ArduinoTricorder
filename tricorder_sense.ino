@@ -908,8 +908,8 @@ void GoHome() {
 	ShowBatteryLevel(213, 50, color_LABELTEXT, color_MAINTEXT);
 	//uptime
 	drawParamText(185, 75, "00:00.00", color_MAINTEXT);
-	//cpu speed	
-	drawParamText(204, 100, String((float) F_CPU / 1023000.0), color_MAINTEXT);
+	//cpu speed - hz to mhz conversion is to divide by 1 million exactly
+	drawParamText(204, 100, String((float) F_CPU / 1000000.0), color_MAINTEXT);
 	//device version
 	drawParamText(235, 100, "           " + String(DEVICE_VERSION), color_MAINTEXT);
 		
