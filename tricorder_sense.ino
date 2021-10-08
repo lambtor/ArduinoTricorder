@@ -1586,6 +1586,7 @@ void ToggleMicrophone() {
 	mbTomServoActive = false;
 	mnCurrentServoGraphPoint = 0;
 	mnServoLastDraw = 0;
+	mbRGBActive = false;
 	
 	if (mbButton3Flag) {
 		DisableSound();
