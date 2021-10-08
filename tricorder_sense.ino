@@ -757,7 +757,7 @@ void DisableFlash() {
 //ex: cycled down-> up, stacking, unified blink, KITT ping pong, etc
 void RunLeftScanner() {
 	unsigned long lTimer = millis();
-	
+		
 	//when color scanner running, use left side lights to convey scan coming soon:
 	if (!mbRGBActive) {
 		if ((lTimer - mnLastUpdateLeftLED) > mnLeftLEDInterval) {		
@@ -805,6 +805,15 @@ void RunLeftScanner() {
 				break;
 		}
 	}
+}
+
+//to-do: call scanner clear on any mode change?
+void ClearLeftScanner() {
+	analogWrite(SCAN_LED_PIN_1, 0); 
+	analogWrite(SCAN_LED_PIN_2, 0); 
+	analogWrite(SCAN_LED_PIN_3, 0); 
+	analogWrite(SCAN_LED_PIN_4, 0); 
+	mnLeftLEDCurrent = 1;
 }
 
 void GoHome() {
@@ -2451,6 +2460,7 @@ void RunTomServo() {
 	if (!mbTomServoActive) return;	
 	
 	//use main arduino loop for ALL graph drawings, with delay enforcer (3000ms / 80) as throttle to allow button polling
+	//3000ms is used because we want these bars to take 3 seconds to cycle through before starting over
 	if (millis() - mnServoLastDraw < mnServoDrawInterval) return;
 		
 	const uint8_t nYBase1 = 98;	
