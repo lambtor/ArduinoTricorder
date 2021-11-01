@@ -2,7 +2,7 @@
 WIP list of assets that could be used with arduino tricorder 
 
 <ul>
-<li><strong>Home Screen: </strong>          showing a very simplified equivalent of windows BGInfo, need retune for thermal camera and active "profile"</li>
+<li><strong>Home Screen: </strong>          showing a very simplified equivalent of windows BGInfo</li>
 <li><strong>RGB Color Scanner: </strong>    OK</li>
 <li><strong>Climate Scanner:</strong>		   OK - updates bar graphs to reflect data without requiring internal loops</li>
 <li><strong>Left-side LED: </strong>        OK, stacks on color scanner mode</li>
