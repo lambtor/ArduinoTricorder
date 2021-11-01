@@ -62,50 +62,70 @@
 #define SCAN_LED_BRIGHTNESS 	32
 
 //neopixel power LED. must use an unreserved pin for this.  PWR, ID, EMRG all use this pin
-#define POWER_LED_PIN 				10
+#define NEOPIXEL_CHAIN_DATAPIN		10
 #define NEOPIXEL_BRIGHTNESS 		64
 #define NEOPIXEL_LED_COUNT 			3
 // built-in pins: D4 = blue conn LED, 8 = neopixel on board, D13 = red LED next to micro usb port
-//#define NEOPIXEL_BOARD_LED_PIN	8
-//#define PIN_NEOPIXEL 8
-//#define BOARD_REDLED_PIN 		13
+#define NEOPIXEL_BOARD_LED_PIN		8
+//#define PIN_NEOPIXEL 				8
+//#define BOARD_REDLED_PIN 			13
 //#define BOARD_BLUELED_PIN 		4
-//#define LED_RED 							13
-//#define LED_BLUE						4
+//#define LED_RED 					13
+//#define LED_BLUE					4
+
+//uncomment this line to have raw magnetometer z value displayed on home screen
+//#define MAGNET_DEBUG	(1)
 
 //system os version #. max 3 digits
-#define DEVICE_VERSION			"0.89"
+#define DEVICE_VERSION			"0.91"
+//theme definition: 0 = TNG, 1 = DS9, 2 = VOY
+#define UX_THEME	(0)
 
-// TNG colors here
-#define color_SWOOP				0xF7B3
-#define color_MAINTEXT			0x9E7F
-//#define color_MAINTEXT			0xC69F
-#define color_LABELTEXT			0x841E
-#define color_HEADER			0xFEC8
-#define color_TITLETEXT			0xFEC8
-//196,187,145
-#define color_LABELTEXT2		0xC5D2
-//204,174,220
-#define color_LABELTEXT3		0xCD7B
-#define color_LABELTEXT4		0xEE31
-#define color_LEGEND			0x6A62
-//210,202,157
-#define color_FFT				0xDEB5
 
-// ds9
-//#define color_SWOOP			0xD4F0
-//#define color_MAINTEXT		0xBD19
-//#define color_LABELTEXT		0x7A8D
-//#define color_HEADER			0xECA7
-//#define color_TITLETEXT		0xC3ED
-//#define color_LABELTEXT2		0xC5D2
-// voy
-//#define color_MAINTEXT		0x9E7F
-//#define color_SWOOP			0x7C34
-//#define color_LABELTEXT		0x9CDF
-//#define color_HEADER			0xCB33
-//#define color_TITLETEXT		0xFFAF
-//#define color_LABELTEXT2		0xC5D2
+#if UX_THEME == 0
+	// TNG colors here
+	#define color_SWOOP				0xF7B3
+	#define color_MAINTEXT			0x9E7F
+	//#define color_MAINTEXT			0xC69F
+	#define color_LABELTEXT			0x841E
+	#define color_HEADER			0xFEC8
+	#define color_TITLETEXT			0xFEC8
+	//196,187,145
+	#define color_LABELTEXT2		0xC5D2
+	//204,174,220
+	#define color_LABELTEXT3		0xCD7B
+	#define color_LABELTEXT4		0xEE31
+	#define color_LEGEND			0x6A62
+	//210,202,157
+	#define color_FFT				0xDEB5
+#elif UX_THEME == 1
+	// ds9
+	#define color_SWOOP			0xD4F0
+	#define color_MAINTEXT		0xBD19
+	#define color_LABELTEXT		0x7A8D
+	#define color_HEADER		0xECA7
+	#define color_TITLETEXT		0xC3ED
+	//to-do: find fitting options for these to mesh with ds9
+	#define color_LABELTEXT2	0xC5D2	
+	#define color_LABELTEXT3		0xCD7B	
+	#define color_LABELTEXT4		0xEE31
+	#define color_LEGEND			0x6A62
+	#define color_FFT				0xDEB5
+#elif UX_THEME == 2
+	// voy
+	#define color_MAINTEXT		0x9E7F
+	#define color_SWOOP			0x7C34
+	#define color_LABELTEXT		0x9CDF
+	#define color_HEADER		0xCB33
+	#define color_TITLETEXT		0xFFAF
+	//to-do: find fitting options for these to mesh with voy
+	#define color_LABELTEXT2	0xC5D2
+	#define color_LABELTEXT3		0xCD7B
+	#define color_LABELTEXT4		0xEE31
+	#define color_LEGEND			0x6A62
+	#define color_FFT				0xDEB5
+#endif
+
 
 #define color_REDLABELTEXT		0xE000
 #define color_REDDARKLABELTEXT	0x9800
@@ -118,8 +138,8 @@
 
 #define RGBto565(r,g,b) ((((r) & 0xF8) << 8) | (((g) & 0xFC) << 3) | ((b) >> 3))
 
-Adafruit_NeoPixel ledPwrStrip(NEOPIXEL_LED_COUNT, POWER_LED_PIN, NEO_GRB + NEO_KHZ800);
-Adafruit_NeoPixel ledBoard(1, PIN_NEOPIXEL, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel ledPwrStrip(NEOPIXEL_LED_COUNT, NEOPIXEL_CHAIN_DATAPIN, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel ledBoard(1, NEOPIXEL_BOARD_LED_PIN, NEO_GRB + NEO_KHZ800);
 
 // do not fuck with this. 2.0 IS THE BOARD - this call uses hardware SPI
 Adafruit_ST7789 tft = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_RST);
@@ -216,17 +236,17 @@ extern PDMClass PDM;
 //mic sample rate is hertz, all samples are stored as 16 bit data.
 //number of samples must be double the desired resolution, and be a base 2 number
 //16k hertz -> 0-8k hertz max audio range captured
-#define MIC_SAMPLESIZE 		256
+#define MIC_SAMPLESIZE 			256
 //16k is the ONLY SUPPORTED SAMPLE RATE!
 //#define MIC_SAMPLERATE		16000
 #define MIC_AMPLITUDE			1000          // Depending on audio source level, you may need to alter this value. Can be used as a 'sensitivity' control.
 #define DECIMATION				64
-#define FFT_REFERENCELINES	16
+#define FFT_REFERENCELINES		16
 //#define FFT_MAX					150
 #define FFT_BINCOUNT        	16
-#define FFT_BARHEIGHTMAX	64
+#define FFT_BARHEIGHTMAX		64
 
-#define GRAPH_OFFSET 10
+#define GRAPH_OFFSET 			10
 #define GRAPH_WIDTH (tft.width() - 3)
 #define GRAPH_HEIGHT (tft.height() - GRAPH_OFFSET)
 #define GRAPH_MIN (tft.height() - 2)
@@ -259,6 +279,8 @@ bool mbButton7Flag = false;
 EasyButton oButton1(BUTTON_1_PIN);
 EasyButton oButton2(BUTTON_2_PIN);
 EasyButton oButton3(BUTTON_3_PIN);
+//board button digital pin 7 - use for thermal camera toggle
+EasyButton oButton7(BUTTON_BOARD);
 
 bool mbSleepMode = false;
 
@@ -267,10 +289,9 @@ bool mbMagnetometer = false;
 float mfMagnetX, mfMagnetY, mfMagnetz;
 int mnLastMagnetCheck = 0;
 int mnMagnetInterval = 1000;
-
-//board button digital pin 7 - use for thermal camera toggle
-EasyButton oButton7(BUTTON_BOARD);
-//bool mbButton7Toggled = false;
+//the -700 threshold was based on resolution of 10, or 1024 max
+//this is intended for the z index reading of magnetometer (negative means field is below the board)
+const int mnMagnetSleepThreshold = -700;
 
 //Adafruit_MLX90640 oThermalCamera;
 const uint8_t mbCameraAddress = 0x33;
@@ -465,6 +486,7 @@ void setup() {
 	oButton7.onPressed(ToggleThermal);
 	//10k potentiometer / scroller should be limited to a readable range of 10-890
 	//analog write values can go from 0 to 255. analogRead can go from 0 to 2^(analogReadResolution)
+	//changing this WILL screw with other stuff, like the magnetometer & battery
 	//analogReadResolution(10);
 	GoHome();
 }
@@ -475,17 +497,19 @@ void loop() {
 	//magnet from speaker throws z = ~ +14000, no magnets has z idle at ~ -500
 	//use z > 5000 ?
 	//all analogRead actions depend on resolution setting - changing this will screw with battery % readings
-	//the -700 threshold was based on resolution of 10, or 1024 max
+	
 	//need tests with speaker above and door magnet below - may require testing within assembled shell
-	if ((millis() - mnLastMagnetCheck) > mnMagnetInterval) {
-		oMagneto.read();
-		if (!mbSleepMode && ((oMagneto.z / 16) < -700)) {
-			SleepMode();
-		} else if (mbSleepMode && ((oMagneto.z / 16) > -700)) {
-			ActiveMode();
+	#if !defined(MAGNET_DEBUG) || MAGNET_DEBUG == 1
+		if ((millis() - mnLastMagnetCheck) > mnMagnetInterval) {
+			oMagneto.read();
+			if (!mbSleepMode && ((oMagneto.z / 16) < mnMagnetSleepThreshold)) {
+				SleepMode();
+			} else if (mbSleepMode && ((oMagneto.z / 16) > mnMagnetSleepThreshold)) {
+				ActiveMode();
+			}
+			mnLastMagnetCheck = millis();
 		}
-		mnLastMagnetCheck = millis();
-	}
+	#endif
 	
 	if (mbSleepMode) return;
 	
@@ -498,8 +522,8 @@ void loop() {
 	//toggle thermal camera
 	oButton7.read();
 			
-	RunNeoPixelColor(POWER_LED_PIN);
-	RunNeoPixelColor(PIN_NEOPIXEL);
+	RunNeoPixelColor(NEOPIXEL_CHAIN_DATAPIN);
+	RunNeoPixelColor(NEOPIXEL_BOARD_LED_PIN);
 	RunLeftScanner();
 	RunHome();
 	//blink board LEDs
@@ -562,7 +586,7 @@ void DisableSound() {
 
 void RunNeoPixelColor(int nPin) {
 	unsigned long lTimer = millis();
-	if (nPin == POWER_LED_PIN) {
+	if (nPin == NEOPIXEL_CHAIN_DATAPIN) {
 		if (mnLastUpdatePower == 0 || ((lTimer - mnLastUpdatePower) > mnPowerLEDInterval)) {
 			//these will need to have their own intervals
 			//switch should eventually be changed to poll voltage pin - pin#, r,g,b
@@ -648,8 +672,9 @@ void RunNeoPixelColor(int nPin) {
 			mnLastUpdateEMRG = lTimer;
 		}		
 		
-	} else if (nPin == PIN_NEOPIXEL) {
+	} else if (nPin == NEOPIXEL_BOARD_LED_PIN) {
 		//unsure if want to use, as this needs to be sensor flash.
+		//this has a separate update interval from power because we want this to come back faster than 30 seconds after color scanner is used
 		if (!mbRGBActive) {
 			if ((lTimer - mnLastUpdateBoard) > mnBoardLEDInterval) {
 				if (mbCycleBoardColor == false) {
@@ -683,6 +708,8 @@ void RunNeoPixelColor(int nPin) {
 
 void SetActiveNeoPixelButton(int nButtonID) {
 	if (NEOPIXEL_LED_COUNT != 6) return;
+	//if bottom right of screen gets a tiny led board, extend same logic to those?
+	//NEOPIXEL_LED_COUNT would be 9 in that case
 	switch (nButtonID) {
 		//home screen, NO APPS ACTIVE
 		case 0: ledPwrStrip.setPixelColor(NEOPIXEL_LED_COUNT-5, 0, 128, 0);
@@ -771,7 +798,7 @@ void RunLeftScanner() {
 			mnLastUpdateLeftLED = lTimer;		
 		}
 	} else {
-		//currently stacks "downward" - all on to only alpha on - which is more like an opening drape
+		//currently stacks "downward" - all on to only alpha on - which is more like a lifting drape
 		switch (mnRGBCooldown) {
 			case 1: 
 				analogWrite(SCAN_LED_PIN_1, SCAN_LED_BRIGHTNESS); 
@@ -1049,7 +1076,7 @@ void RunHome() {
 		mnLastUpdateHome = millis();
 	}
 	//raw magnet data output to home screen for debug
-	/*
+	#if defined(MAGNET_DEBUG)
 	if (mbMagnetometer && (millis() - mnLastMagnetCheck) > mnMagnetInterval) {
 		oMagneto.read();
 		//output raw data to screen - test this with magnet behind 4mm of PLA ~
@@ -1058,7 +1085,8 @@ void RunHome() {
 		tft.fillRect(250, 60, 40, 20, ST77XX_BLACK);
 		drawParamText(250, 75, (String)oMagneto.z, color_MAINTEXT);
 		mnLastMagnetCheck = millis();
-	}*/
+	}
+	#endif
 }
 
 void ResetWireClock() {
