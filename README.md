@@ -31,6 +31,6 @@ Refrences used:<br/>
 
 ![decibel demo gif](https://github.com/lambtor/ArduinoTricorder/blob/master/decibel.gif?raw=true)
 
-![board pinout](https://github.com/lambtor/ArduinoTricorder/blob/master/tricorderV10-pinout.jpg)
+![board pinout](https://github.com/lambtor/ArduinoTricorder/blob/master/tricorderV10-pinoutLT.jpg)
 
 
