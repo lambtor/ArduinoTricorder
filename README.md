@@ -1,5 +1,5 @@
 # ArduinoTricorder
-WIP list of assets that could be used with arduino tricorder 
+WIP: list of digital assets that could be used with arduino tricorder 
 
 <ul>
 <li><strong>Home Screen: </strong>          showing a very simplified equivalent of windows BGInfo</li>
