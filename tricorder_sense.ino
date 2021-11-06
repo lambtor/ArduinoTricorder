@@ -27,26 +27,26 @@
 //need to use pin 6 for TFT_CS, as pin 20 is analog 7. analog 7 is the only way to get current voltage, which is used for battery %
 
 //MISO is not required for screen to work - this is used by mem card only?
-#define TFT_CS 						6
+#define TFT_CS 						(6)
 // SD card select pin
 //#define SD_CS 			11 	//- can't use pin 4 as that is for blue connection led
 #define TFT_RST 					-1
-#define TFT_DC 						5
-#define USE_SD_CARD 				0
+#define TFT_DC 						(5)
+#define USE_SD_CARD 				(0)
 
 //pin 9 is free, as pin_a6 is for vbat and is otherwise known as digital 20
 #define VOLT_PIN 					PIN_A6		//INPUT_POWER_PIN
-#define SOUND_TRIGGER_PIN			9
+#define SOUND_TRIGGER_PIN			(9)
 
 //buttons, scroller	- d2 pin supposed to be pin #2
 //button on the board is connected to pin 7.  TX is pin 0, RX is pin 1 - these are normally used for serial communication
 
 #define BUTTON_1_PIN				PIN_SERIAL1_RX
 #define BUTTON_2_PIN				PIN_SERIAL1_TX
-//adafruit defines pin D2 as pin 2 in its header file, but it does not respond when set as an input by default.
+//adafruit defines physically labeled pin D2 as pin 2 in its header file, but it does not respond when set as an input by default.
 //you will need to modify system_nrf52840.c file by adding
 //#define CONFIG_NFCT_PINS_AS_GPIOS (1)
-//YOU WILL SEE THIS CONSTANT IN THAT FILE, with conditional logic around it to actually free up the NFC pins, but only if that constant exists in that file
+//YOU WILL SEE THIS CONSTANT REFERENCED IN THAT FILE, with compiler-conditional logic around it to actually free up the NFC pins, but only if that constant exists in that file
 #define BUTTON_3_PIN				(2)
 
 //pin 7 is the board button
@@ -59,14 +59,14 @@
 #define SCAN_LED_PIN_3 			PIN_A4
 #define SCAN_LED_PIN_4 			PIN_A5
 
-#define SCAN_LED_BRIGHTNESS 	32
+#define SCAN_LED_BRIGHTNESS 	(32)
 
 //neopixel power LED. must use an unreserved pin for this.  PWR, ID, EMRG all use this pin
-#define NEOPIXEL_CHAIN_DATAPIN		10
-#define NEOPIXEL_BRIGHTNESS 		64
-#define NEOPIXEL_LED_COUNT 			3
+#define NEOPIXEL_CHAIN_DATAPIN		(10)
+#define NEOPIXEL_BRIGHTNESS 		(64)
+#define NEOPIXEL_LED_COUNT 			(3)
 // built-in pins: D4 = blue conn LED, 8 = neopixel on board, D13 = red LED next to micro usb port
-#define NEOPIXEL_BOARD_LED_PIN		8
+#define NEOPIXEL_BOARD_LED_PIN		(8)
 //#define PIN_NEOPIXEL 				8
 //#define BOARD_REDLED_PIN 			13
 //#define BOARD_BLUELED_PIN 		4
