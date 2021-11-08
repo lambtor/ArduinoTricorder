@@ -719,19 +719,19 @@ void SetActiveNeoPixelButton(int nButtonID) {
 				ledPwrStrip.setPixelColor(NEOPIXEL_LED_COUNT-3, 0, 128, 0);
 				break;
 		//GEO
-		case 1: ledPwrStrip.setPixelColor(NEOPIXEL_LED_COUNT-5, 112, 128, 0);
+		case 1: ledPwrStrip.setPixelColor(NEOPIXEL_LED_COUNT-5, 164, 128, 0);
 				ledPwrStrip.setPixelColor(NEOPIXEL_LED_COUNT-4, 0, 128, 0);
 				ledPwrStrip.setPixelColor(NEOPIXEL_LED_COUNT-3, 0, 128, 0);
 				break;
 		//MET
 		case 2: ledPwrStrip.setPixelColor(NEOPIXEL_LED_COUNT-5, 0, 128, 0);
-				ledPwrStrip.setPixelColor(NEOPIXEL_LED_COUNT-4, 112, 128, 0);
+				ledPwrStrip.setPixelColor(NEOPIXEL_LED_COUNT-4, 164, 128, 0);
 				ledPwrStrip.setPixelColor(NEOPIXEL_LED_COUNT-3, 0, 128, 0);
 				break;
 		//BIO
 		case 3: ledPwrStrip.setPixelColor(NEOPIXEL_LED_COUNT-5, 0, 128, 0);
 				ledPwrStrip.setPixelColor(NEOPIXEL_LED_COUNT-4, 0, 128, 0);
-				ledPwrStrip.setPixelColor(NEOPIXEL_LED_COUNT-3, 112, 128, 0);
+				ledPwrStrip.setPixelColor(NEOPIXEL_LED_COUNT-3, 164, 128, 0);
 				break;
 		//CAMERA - all RED
 		case 4: ledPwrStrip.setPixelColor(NEOPIXEL_LED_COUNT-5, 128, 0, 0);
