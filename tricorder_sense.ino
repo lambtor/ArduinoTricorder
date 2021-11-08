@@ -604,8 +604,7 @@ void RunNeoPixelColor(int nPin) {
 					default: ledPwrStrip.setPixelColor(0, 128, 0, 0); mnPowerColor = 4; break;
 				}
 			} else {
-				float fBattV = analogRead(VOLT_PIN);
-				int nBattMap = map(fBattV, 0, 600, 0, 5);
+				int nBattMap = GetBatteryTier();
 				switch (nBattMap) {
 					case 4: ledPwrStrip.setPixelColor(0, 0, 0, 128); break;
 					case 3: ledPwrStrip.setPixelColor(0, 0, 128, 0); break;
@@ -616,7 +615,7 @@ void RunNeoPixelColor(int nPin) {
 			}	//end if powercolorCycle
 						
 			mnLastUpdatePower = lTimer;
-			//ledPwrStrip.show();
+			ledPwrStrip.show();
 		}
 		
 		//need to push ID LED separate from power, as PWR only updates every 30 seconds
@@ -682,8 +681,7 @@ void RunNeoPixelColor(int nPin) {
 		if (!mbRGBActive) {
 			if ((lTimer - mnLastUpdateBoard) > mnBoardLEDInterval) {
 				if (mbCycleBoardColor == false) {
-					float fBattVBoard = analogRead(VOLT_PIN);
-					int nBattMapBoard = map(fBattVBoard, 0, 600, 0, 5);
+					int nBattMapBoard = GetBatteryTier();
 					//cycle order = blue, green, yellow, orange, red
 					switch (nBattMapBoard) {
 						case 4: ledBoard.setPixelColor(0, 0, 0, 128); break;
@@ -1376,6 +1374,20 @@ void ShowBatteryLevel(int nPosX, int nPosY, uint16_t nLabelColor, uint16_t nValu
 	drawParamText(nPosX + GetBuffer(nBattPct), nPosY, const_cast<char*>(sBatteryStatus.c_str()), color_MAINTEXT);
 	
 }
+
+uint8_t GetBatteryTier() {
+	float fBattV = analogRead(VOLT_PIN);
+	fBattV *= 6.6;
+	fBattV /= 1024; // convert to voltage
+	
+	//convert voltage to a percentage
+	fBattV = fBattV * 100;
+	fBattV = constrain(fBattV, 320, 420);
+	int nBattPct = map(fBattV, 320, 420, 0, 100);
+	//divide by 20 converts the % to a number 0-4. we have 5 total colors for conveying battery level.
+	return nBattPct / 20;	
+}
+
 
 void ToggleClimateSensor() {
 	ResetWireClock();		
