@@ -77,7 +77,7 @@
 //#define MAGNET_DEBUG	(1)
 
 //system os version #. max 3 digits
-#define DEVICE_VERSION			"0.91"
+#define DEVICE_VERSION			"0.92"
 //theme definition: 0 = TNG, 1 = DS9, 2 = VOY
 #define UX_THEME	(0)
 
