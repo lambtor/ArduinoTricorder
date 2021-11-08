@@ -64,7 +64,7 @@
 //neopixel power LED. must use an unreserved pin for this.  PWR, ID, EMRG all use this pin
 #define NEOPIXEL_CHAIN_DATAPIN		(10)
 #define NEOPIXEL_BRIGHTNESS 		(64)
-#define NEOPIXEL_LED_COUNT 			(3)
+#define NEOPIXEL_LED_COUNT 			(6)
 // built-in pins: D4 = blue conn LED, 8 = neopixel on board, D13 = red LED next to micro usb port
 #define NEOPIXEL_BOARD_LED_PIN		(8)
 //#define PIN_NEOPIXEL 				8
@@ -186,6 +186,9 @@ bool mbBoardBlueLED = false;
 //colors range is purple > blue > green > yellow > orange > red > pink > white
 const uint32_t mnIDLEDColorscape[] = {0x8010,0x0010,0x0400,0x7C20,0x8300,0x8000,0x8208,0x7C30};
 const String marrProfiles[] = {"ALPHA","BETA","GAMMA","DELTA","EPSILON","ZETA","ETA","THETA"};
+//reverse order for these makes the scroller show alpha when 
+//const String marrProfiles[] = {"THETA","ETA","ZETA","EPSILON","DELTA","GAMMA","BETA","ALPHA"};
+
 const uint16_t mnThermalCameraLabels[] = {0xD6BA,0xC0A3,0xD541,0xD660,0x9E02,0x0458,0x89F1};
 
 //color sensor
@@ -290,8 +293,9 @@ float mfMagnetX, mfMagnetY, mfMagnetz;
 int mnLastMagnetCheck = 0;
 int mnMagnetInterval = 1000;
 //the -700 threshold was based on resolution of 10, or 1024 max
+//-20000 is based on the analog resolution required by battery pin
 //this is intended for the z index reading of magnetometer (negative means field is below the board)
-const int mnMagnetSleepThreshold = -700;
+const int mnMagnetSleepThreshold = -20000;
 
 //Adafruit_MLX90640 oThermalCamera;
 const uint8_t mbCameraAddress = 0x33;
