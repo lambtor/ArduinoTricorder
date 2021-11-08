@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="26mm"
+   height="37mm"
+   viewBox="0 0 26 37"
+   version="1.1"
+   id="svg5"
+   sodipodi:docname="ID.svg"
+   inkscape:version="1.1 (c68e22c387, 2021-05-23)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview7"
+     pagecolor="#ffffff"
+     bordercolor="#111111"
+     borderopacity="1"
+     inkscape:pageshadow="0"
+     inkscape:pageopacity="0"
+     inkscape:pagecheckerboard="1"
+     inkscape:document-units="mm"
+     showgrid="false"
+     inkscape:zoom="1.8973437"
+     inkscape:cx="180.51553"
+     inkscape:cy="84.855475"
+     inkscape:window-width="1920"
+     inkscape:window-height="1004"
+     inkscape:window-x="-4"
+     inkscape:window-y="-4"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="layer1" />
+  <defs
+     id="defs2" />
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1">
+    <path
+       id="rect1472"
+       style="fill:#808080;stroke-width:0.25723"
+       d="M 2.99982,0 C 1.33782,0 0,1.33782 0,2.99982 V 8.5999897 C 0,10.26199 1.33782,11.59981 2.99982,11.59981 h 11.600321 c 1.662,0 2.99982,-1.33782 2.99982,-2.9998203 V 2.99982 C 17.599961,1.33782 16.262141,0 14.600141,0 Z M 2.66495,2.59984 h 3.6700602 c 0.47914,0 0.86507,0.38541 0.86507,0.86455 v 4.6705097 c 0,0.47914 -0.38593,0.86507 -0.86507,0.86507 H 2.66495 c -0.47913,0 -0.86506,-0.38593 -0.86506,-0.86507 V 3.46439 c 0,-0.47914 0.38593,-0.86455 0.86506,-0.86455 z" />
+    <text
+       xml:space="preserve"
+       style="font-weight:bold;font-size:4.23333px;line-height:1.25;font-family:'MicrogrammaEF Extend';-inkscape-font-specification:'MicrogrammaEF Extend Bold';fill:#ffffff;fill-opacity:1;stroke-width:0.264583"
+       x="9.3244419"
+       y="8.9983835"
+       id="text8642"><tspan
+         sodipodi:role="line"
+         id="tspan8640"
+         style="fill:#ffffff;fill-opacity:1;stroke-width:0.264583"
+         x="9.3244419"
+         y="8.9983835">ID</tspan></text>
+  </g>
+</svg>
