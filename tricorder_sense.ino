@@ -74,7 +74,7 @@
 //#define LED_BLUE					4
 
 //uncomment this line to have raw magnetometer z value displayed on home screen
-//#define MAGNET_DEBUG	(1)
+//#define MAGNET_DEBUG	(0)
 
 //system os version #. max 3 digits
 #define DEVICE_VERSION			"0.92"
@@ -295,7 +295,7 @@ int mnMagnetInterval = 1000;
 //the -700 threshold was based on resolution of 10, or 1024 max
 //-20000 is based on the analog resolution required by battery pin
 //this is intended for the z index reading of magnetometer (negative means field is below the board)
-const int mnMagnetSleepThreshold = -20000;
+int mnMagnetSleepThreshold = -20000;
 
 //Adafruit_MLX90640 oThermalCamera;
 const uint8_t mbCameraAddress = 0x33;
@@ -503,12 +503,12 @@ void loop() {
 	//all analogRead actions depend on resolution setting - changing this will screw with battery % readings
 	
 	//need tests with speaker above and door magnet below - may require testing within assembled shell
-	#if !defined(MAGNET_DEBUG) || MAGNET_DEBUG == 1
+	#if !defined(MAGNET_DEBUG)
 		if ((millis() - mnLastMagnetCheck) > mnMagnetInterval) {
 			oMagneto.read();
-			if (!mbSleepMode && ((oMagneto.z / 16) < mnMagnetSleepThreshold)) {
+			if (!mbSleepMode && (oMagneto.z < mnMagnetSleepThreshold)) {
 				SleepMode();
-			} else if (mbSleepMode && ((oMagneto.z / 16) > mnMagnetSleepThreshold)) {
+			} else if (mbSleepMode && (oMagneto.z > mnMagnetSleepThreshold)) {
 				ActiveMode();
 			}
 			mnLastMagnetCheck = millis();
