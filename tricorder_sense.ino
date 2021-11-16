@@ -314,7 +314,7 @@ float mfCameraEmissivity = 0.95;
 bool mbThermalCameraStarted = false;
 bool mbThermalActive = false;
 //this interval caps draw and thermal data frame rates. camera data will run slower than 30fps, but this throttle is needed to allow button press event polling
-uint8_t mnThermalCameraInterval = 16;
+uint8_t mnThermalCameraInterval = 50;
 unsigned long mnLastCameraFrame = 0;
 //this must be less than 10 for all data to be displayed on 320x240. 
 //this scales display window to 256 x 192, a border of 24px all around
@@ -1972,8 +1972,10 @@ void RunThermal() {
 			MLX90640_CalculateTo(arrTempFrameRaw, &moCameraParams, mfCameraEmissivity, mfTR, mfarrTempFrame);		
 		}
 		
-		for (uint8_t nRow = 0; nRow < 24; nRow++) {
-			for (uint8_t nCol = 0; nCol < 32; nCol++) {		
+		for (uint8_t nRow = 0; nRow < 24; nRow++) {	
+			//need option to flip left-right of thermal camera display
+			//for (uint8_t nCol = 0; nCol < 32; nCol++) {
+			for (uint8_t nCol = 0; nCol < 32; nCol++) {
 				float fTemp = mfarrTempFrame[nRow*32 + nCol];
 				
 				//clip temperature readings to defined range for color mapping
