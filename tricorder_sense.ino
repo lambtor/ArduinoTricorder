@@ -77,7 +77,7 @@
 //#define MAGNET_DEBUG	(0)
 
 //system os version #. max 3 digits
-#define DEVICE_VERSION			"0.92"
+#define DEVICE_VERSION			"0.93"
 //theme definition: 0 = TNG, 1 = DS9, 2 = VOY
 #define UX_THEME	(0)
 
@@ -291,11 +291,13 @@ Adafruit_LIS3MDL oMagneto;
 bool mbMagnetometer = false;
 float mfMagnetX, mfMagnetY, mfMagnetz;
 int mnLastMagnetCheck = 0;
-int mnMagnetInterval = 1000;
+int mnMagnetInterval = 2000;
 //the -700 threshold was based on resolution of 10, or 1024 max
 //-20000 is based on the analog resolution required by battery pin
 //this is intended for the z index reading of magnetometer (negative means field is below the board)
 int mnMagnetSleepThreshold = -20000;
+//if this cutoff is not working, either change where your speaker sits in the shell or add another magnet to your door to force the z-drop
+int mnLastMagnetValue = 0;
 
 //Adafruit_MLX90640 oThermalCamera;
 const uint8_t mbCameraAddress = 0x33;
@@ -314,6 +316,7 @@ float mfCameraEmissivity = 0.95;
 bool mbThermalCameraStarted = false;
 bool mbThermalActive = false;
 //this interval caps draw and thermal data frame rates. camera data will run slower than 30fps, but this throttle is needed to allow button press event polling
+//50ms -> 20fps cap
 uint8_t mnThermalCameraInterval = 50;
 unsigned long mnLastCameraFrame = 0;
 //this must be less than 10 for all data to be displayed on 320x240. 
@@ -348,7 +351,7 @@ const uint16_t mnarrThermalDisplayColors[] = {0x480F, 0x400F,0x400F,0x400F,0x401
 bool mbTomServoActive = false;
 unsigned long mnButton2Press = 0;
 unsigned long mnButton3Press = 0;
-int mnServoButtonWindow = 1000;
+int mnServoButtonWindow = 1500;
 //graphs should take 3 seconds for full draw cycle-> 3000 / 80 lines
 uint8_t mnServoDrawInterval = 38;
 unsigned long mnServoLastDraw = 0;
@@ -506,11 +509,14 @@ void loop() {
 	#if !defined(MAGNET_DEBUG)
 		if ((millis() - mnLastMagnetCheck) > mnMagnetInterval) {
 			oMagneto.read();
-			if (!mbSleepMode && (oMagneto.z < mnMagnetSleepThreshold)) {
+			//magnet function modification needs to use a massive drop as the sleep trigger.
+			int nCurrentMagnetZ = oMagneto.z;
+						
+			if (!mbSleepMode && (nCurrentMagnetZ < mnMagnetSleepThreshold)) {
 				SleepMode();
-			} else if (mbSleepMode && (oMagneto.z > mnMagnetSleepThreshold)) {
+			} else if (mbSleepMode && (nCurrentMagnetZ > mnMagnetSleepThreshold)) {
 				ActiveMode();
-			}
+			}			
 			mnLastMagnetCheck = millis();
 		}
 	#endif
@@ -897,7 +903,7 @@ void GoHome() {
 	tft.fillRect(1, 147, 58, 55, RGBto565((int)min(mnCurrentProfileRed*1.75, 255), (int)min(mnCurrentProfileGreen*1.75, 255), (int)min(mnCurrentProfileBlue*1.75, 255)));
 	//profile label always shows bkg as swoop color 
 	tft.fillRect(1, 119, 58, 24, color_SWOOP);
-	drawParamText(6, 138, msCurrentProfileName, ST77XX_BLACK);
+	
 	
 	
 	//middle section black lines
@@ -937,6 +943,8 @@ void GoHome() {
 	tft.fillRoundRect(252, 87, 14, 11, 5, color_MAINTEXT);
 	//set font to 11pt since header is done	
 	tft.setFont(&lcars11pt7b);
+	
+	drawParamText(6, 138, msCurrentProfileName, ST77XX_BLACK);
 	
 	drawParamText(101, 50, "POWER", color_LABELTEXT);
 	drawParamText(101, 75, "UPTIME", color_LABELTEXT);
@@ -1037,10 +1045,12 @@ void GoHome() {
 void RunHome() {	
 	if (!mbHomeActive) return;
 	
+	unsigned long nNowMillis = millis();
+	
 	//show system uptime, battery level		
-	if (millis() - mnLastUpdateHome > mnHomeUpdateInterval) {
+	if (nNowMillis - mnLastUpdateHome > mnHomeUpdateInterval) {
 		//blank last uptime display, refresh values
-		int nUptimeSeconds = (millis() / 1000);
+		int nUptimeSeconds = (nNowMillis / 1000);
 		int nUptimeMinutes = (nUptimeSeconds / 60);
 		int nDisplayMinutes = nUptimeMinutes;
 		int nUptimeHours = nUptimeMinutes / 60;
@@ -1075,20 +1085,20 @@ void RunHome() {
 		//tft.fillRect(250, 60, 60, 20, ST77XX_BLACK);
 		//drawParamText(250, 75, (String)analogRead(PIN_SCROLL_INPUT), color_MAINTEXT); 
 		
-		mnLastUpdateHome = millis();
+		mnLastUpdateHome = nNowMillis;
 	}
-	//raw magnet data output to home screen for debug
-	#if defined(MAGNET_DEBUG)
-	if (mbMagnetometer && (millis() - mnLastMagnetCheck) > mnMagnetInterval) {
+	//raw magnet z index data output to home screen for debug
+	//#if defined(MAGNET_DEBUG)
+	if (mbMagnetometer && ((nNowMillis - mnLastMagnetCheck) > mnMagnetInterval)) {
 		oMagneto.read();
 		//output raw data to screen - test this with magnet behind 4mm of PLA ~
 		//drawParamText(250, 25, (String)oMagneto.x, color_MAINTEXT);
 		//drawParamText(250, 50, (String)oMagneto.y, color_MAINTEXT);
 		tft.fillRect(250, 60, 40, 20, ST77XX_BLACK);
 		drawParamText(250, 75, (String)oMagneto.z, color_MAINTEXT);
-		mnLastMagnetCheck = millis();
+		mnLastMagnetCheck = nNowMillis;
 	}
-	#endif
+	//#endif
 }
 
 void ResetWireClock() {
@@ -1956,7 +1966,7 @@ void RunThermal() {
 	}
 		
 	//pimoroni camera "bottom" of view is section with pin holes
-	//use 30fps cap to restrict how often it tries to pull camera data, or this will block button press polling
+	//use 10fps cap to restrict how often it tries to pull camera data, or this will block button press polling
 	//need 2 data frames for each displayed frame, as it only pulls half the range at a time.
 	if ((millis() - mnLastCameraFrame) > mnThermalCameraInterval) {		
 		//iterate through full frame capture, then do 1 draw with all values
@@ -1975,22 +1985,18 @@ void RunThermal() {
 		for (uint8_t nRow = 0; nRow < 24; nRow++) {	
 			//need option to flip left-right of thermal camera display
 			//for (uint8_t nCol = 0; nCol < 32; nCol++) {
-			for (uint8_t nCol = 0; nCol < 32; nCol++) {
+			for (uint8_t nCol = 0; nCol < 32; nCol++) {				
 				float fTemp = mfarrTempFrame[nRow*32 + nCol];
 				
 				//clip temperature readings to defined range for color mapping
 				//may want to increase color fidelity to accomodate larger range?
 				fTemp = min(fTemp, MAX_CAMERA_TEMP);
 				fTemp = max(fTemp, MIN_CAMERA_TEMP); 
-				//if (nRow == 0 && nCol == 0) {
-				//	tft.fillRect(50, 50, 24, 16, ST77XX_BLUE);
-				//	drawParamText(50, 70, (String)mfarrTempFrame[0], ST77XX_WHITE);
-				//}
-				//mnarrThermalDisplayColors
-				uint8_t nColorIndex = map(fTemp, 20, 35, 0, 280);
-				nColorIndex = constrain(nColorIndex, 0, 280);
+				uint8_t nColorIndex = map(fTemp, 20, 35, 0, 279);
+				nColorIndex = constrain(nColorIndex, 0, 279);
 				
 				//draw the pixels
+				//need to flip this left/right. top/down shows correct, so instead of width * col we need width * (31-col)
 				//tft.fillRect((mnThermalPixelWidth * nCol) + mnCameraDisplayStartX, (mnThermalPixelHeight * nRow) + mnCameraDisplayStartY, mnThermalPixelWidth, mnThermalPixelHeight, mnarrThermalDisplayColors[nColorIndex]);
 				tft.fillRect((mnThermalPixelWidth * (31 - nCol)) + mnCameraDisplayStartX, (mnThermalPixelHeight * nRow) + mnCameraDisplayStartY, mnThermalPixelWidth, mnThermalPixelHeight, mnarrThermalDisplayColors[nColorIndex]);
 			}
