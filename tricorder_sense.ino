@@ -1992,7 +1992,7 @@ void RunThermal() {
 				//may want to increase color fidelity to accomodate larger range?
 				fTemp = min(fTemp, MAX_CAMERA_TEMP);
 				fTemp = max(fTemp, MIN_CAMERA_TEMP); 
-				uint8_t nColorIndex = map(fTemp, 20, 35, 0, 279);
+				uint8_t nColorIndex = map(fTemp, MIN_CAMERA_TEMP, MAX_CAMERA_TEMP, 0, 279);
 				nColorIndex = constrain(nColorIndex, 0, 279);
 				
 				//draw the pixels
