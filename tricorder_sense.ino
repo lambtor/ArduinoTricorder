@@ -579,10 +579,13 @@ void SleepMode() {
 }
 
 void ActiveMode() {	
-	mbSleepMode = false;
+	mbSleepMode = false;	
 	tft.enableSleep(false);
 	//tft.enableDisplay(true);
-	
+	//force immediate refresh of neopixel LEDs
+	mnLastUpdatePower = 0;
+	mnLastUpdateIDLED = 0;
+	mnLastUpdateEMRG = 0;
 	GoHome();
 }
 
