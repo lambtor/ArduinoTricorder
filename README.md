@@ -35,4 +35,4 @@ Refrences used:<br/>
 
 <br/>
 Reference of all parts used in build demoed on youtube:
-![all_parts](https://github.com/lambtor/ArduinoTricorder/blob/master/AllParts.JPG)
+![all_parts](https://github.com/lambtor/ArduinoTricorder/raw/master/AllParts.JPG)
