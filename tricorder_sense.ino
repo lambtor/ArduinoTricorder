@@ -66,6 +66,7 @@
 #define NEOPIXEL_BRIGHTNESS 		(64)
 #define NEOPIXEL_LED_COUNT 			(6)
 // built-in pins: D4 = blue conn LED, 8 = neopixel on board, D13 = red LED next to micro usb port
+// commented out lines are pre-defined by the adafruit board firmware
 #define NEOPIXEL_BOARD_LED_PIN		(8)
 //#define PIN_NEOPIXEL 				8
 //#define BOARD_REDLED_PIN 			13
@@ -73,14 +74,17 @@
 //#define LED_RED 					13
 //#define LED_BLUE					4
 
-//uncomment this line to have raw magnetometer z value displayed on home screen
-//#define MAGNET_DEBUG	(0)
-
 //system os version #. max 3 digits
-#define DEVICE_VERSION			"0.93"
+#define DEVICE_VERSION			"0.94"
 //theme definition: 0 = TNG, 1 = DS9, 2 = VOY
 #define UX_THEME	(0)
 
+//uncomment this line to have raw magnetometer z value displayed on home screen
+//#define MAGNET_DEBUG	(0)
+//the -700 threshold was based on resolution of 10, or 1024 max
+//-20000 is based on the analog resolution required by battery pin (-32768 to 32768 range)
+//this is intended for the z index reading of magnetometer (negative means field is below the board)
+int mnMagnetSleepThreshold = -20000;
 
 #if UX_THEME == 0
 	// TNG colors here
@@ -292,10 +296,6 @@ bool mbMagnetometer = false;
 float mfMagnetX, mfMagnetY, mfMagnetz;
 int mnLastMagnetCheck = 0;
 int mnMagnetInterval = 2000;
-//the -700 threshold was based on resolution of 10, or 1024 max
-//-20000 is based on the analog resolution required by battery pin
-//this is intended for the z index reading of magnetometer (negative means field is below the board)
-int mnMagnetSleepThreshold = -20000;
 //if this cutoff is not working, either change where your speaker sits in the shell or add another magnet to your door to force the z-drop
 int mnLastMagnetValue = 0;
 
@@ -548,8 +548,7 @@ void loop() {
 
 void SleepMode() {
 	mbSleepMode = true;
-	//reset all "status" variables
-	GoHome();
+	
 	//turn off screen 
 	tft.fillScreen(ST77XX_BLACK);		
 	//need wired pin to set backlight low here
@@ -570,12 +569,37 @@ void SleepMode() {
 	analogWrite(SCAN_LED_PIN_2, 0);
 	analogWrite(SCAN_LED_PIN_3, 0);
 	analogWrite(SCAN_LED_PIN_4, 0);
-	//set chained neopixels off - PWR, EMRG, ID
-	ledPwrStrip.setPixelColor(0, 0, 0, 0);
-	ledPwrStrip.setPixelColor(1, 0, 0, 0);
-	ledPwrStrip.setPixelColor(2, 0, 0, 0);
-	ledPwrStrip.show();
+	//set chained neopixels off - PWR, EMRG, ID	
+	ledPwrStrip.clear();
+	//ledPwrStrip.show();
 	mbLEDIDSet = false;
+	
+	//reset all "status" variables
+	mnRGBCooldown = 0;
+	mnClimateCooldown = 0;
+	mbHomeActive = true;
+	mbRGBActive = false;
+	mbTempActive = false;	
+	mbThermalActive = false;
+	mbTomServoActive = false;
+	mnCurrentServoGraphPoint = 0;
+	mnServoLastDraw = 0;
+	SetActiveNeoPixelButton(0);
+	
+	mbButton1Flag = false;
+	mbButton2Flag = false;
+	mbButton3Flag = false;
+	
+	//reset any bar graph values from climate
+	mnTempTargetBar = 0;
+	mnTempCurrentBar = 0;
+	mnHumidTargetBar = 0;
+	mnHumidCurrentBar = 0;
+	mnBaromTargetBar = 0;
+	mnBaromCurrentBar = 0;
+	mbHumidBarComplete = false;
+	mbTempBarComplete = false;
+	mbBaromBarComplete = false;
 }
 
 void ActiveMode() {	
@@ -906,8 +930,6 @@ void GoHome() {
 	tft.fillRect(1, 147, 58, 55, RGBto565((int)min(mnCurrentProfileRed*1.75, 255), (int)min(mnCurrentProfileGreen*1.75, 255), (int)min(mnCurrentProfileBlue*1.75, 255)));
 	//profile label always shows bkg as swoop color 
 	tft.fillRect(1, 119, 58, 24, color_SWOOP);
-	
-	
 	
 	//middle section black lines
 	tft.drawFastHLine(1, 35, 58, ST77XX_BLACK);
@@ -1363,44 +1385,41 @@ void RunRGBSensor() {
 	}	
 }	//end runRGBSensor
 
+
 void ShowBatteryLevel(int nPosX, int nPosY, uint16_t nLabelColor, uint16_t nValueColor) {
 	String sBatteryStatus = "";  
-	float fBattV = analogRead(VOLT_PIN);
-	
-	//fBattV *= 2;    // we divided by 2 (board has a resistor on this pin), so multiply back,  // Multiply by 3.3V, our reference voltage
-	//fBattV *= 3.3; 
-	//combine previous actions for brevity- multiply by 2 to adjust for resistor, then 3.3 reference voltage
-	fBattV *= 6.6;
-	fBattV /= 1024; // convert to voltage
-	//3.3 to 4.2 => subtract 3.3 (0) from current voltage. now values should be in range of 0-0.9 : multiply by 1.111, then by 100, convert result to int.
-	//fBattV -= 3.3;	
-	//convert voltage to a percentage
-	fBattV = fBattV * 100;
-	fBattV = constrain(fBattV, 320, 420);
-	int nBattPct = map(fBattV, 320, 420, 0, 100);
-	//int nBattPct = map(fBattV, 0, 600, 0, 101);
-	
+	int nBattPct = GetBatteryPercent();
 	//need to use space characters to pad string because it'll wrap back around to left edge when cursor starting point set over 240.
 	//this is a glitch of adafruit GFX library - it thinks display is 240x320 despite the rotation in setup() and setting for text wrap
 	//sBatteryStatus = "      " + String((int)fBattV);
 	sBatteryStatus = String(nBattPct);
-	drawParamText(nPosX + GetBuffer(nBattPct), nPosY, const_cast<char*>(sBatteryStatus.c_str()), color_MAINTEXT);
-	
+	drawParamText(nPosX + GetBuffer(nBattPct), nPosY, const_cast<char*>(sBatteryStatus.c_str()), color_MAINTEXT);	
 }
 
 uint8_t GetBatteryTier() {
-	float fBattV = analogRead(VOLT_PIN);
-	fBattV *= 6.6;
-	fBattV /= 1024; // convert to voltage
-	
-	//convert voltage to a percentage
-	fBattV = fBattV * 100;
-	fBattV = constrain(fBattV, 320, 420);
-	int nBattPct = map(fBattV, 320, 420, 0, 100);
+	//int nBattPct = map(fBattV, 320, 420, 0, 100);
+	int nBattPct = GetBatteryPercent();
 	//divide by 20 converts the % to a number 0-4. we have 5 total colors for conveying battery level.
 	return nBattPct / 20;	
 }
 
+uint8_t GetBatteryPercent() {
+	float fBattV = analogRead(VOLT_PIN);
+	//fBattV *= 2;    // we divided by 2 (board has a resistor on this pin), so multiply back,  // Multiply by 3.3V, our reference voltage
+	// apparently, previous versions used 3.3 as battery reference, but now this is 3.6
+	// for this reason, if you use 3.3 with a newer version of firmware, batt % will show 60 when it should be 100
+	//fBattV *= 3.6; 	
+	//combine previous actions for brevity- multiply by 2 to adjust for resistor, then 3.3 reference voltage
+	fBattV *= 7.2;
+	fBattV /= 1024; // convert to voltage
+	//3.2 to 4.2 => subtract 3.2 (0) from current voltage. now values should be in range of 0-0.9 : multiply by 1.111, then by 100, convert result to int.
+	//fBattV -= 3.2;	
+	//convert voltage to a percentage
+	//fBattV = fBattV * 100;
+	fBattV = constrain(fBattV, 3.20, 4.20);
+	int nBattPct = map(fBattV, 3.20, 4.20, 0, 100);
+	return nBattPct;
+}
 
 void ToggleClimateSensor() {
 	ResetWireClock();		
