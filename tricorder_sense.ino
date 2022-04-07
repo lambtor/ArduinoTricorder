@@ -78,6 +78,7 @@
 #define DEVICE_VERSION			"0.94"
 //theme definition: 0 = TNG, 1 = DS9, 2 = VOY
 #define UX_THEME	(0)
+#define THERMAL_CAMERA_PORTRAIT		(0)
 
 //uncomment this line to have raw magnetometer z value displayed on home screen
 //#define MAGNET_DEBUG	(0)
@@ -306,7 +307,6 @@ paramsMLX90640 moCameraParams;
 //temperature cutoffs are given in celsius. -12C => -10F
 int MIN_CAMERA_TEMP = 20;
 int MAX_CAMERA_TEMP = 35;
-int THERMAL_CAMERA_VISIBLE_DEPTH = 8;
  
 //need array length of 768 as this is 32*24 resolution
 float mfarrTempFrame[768];
@@ -321,10 +321,14 @@ uint8_t mnThermalCameraInterval = 50;
 unsigned long mnLastCameraFrame = 0;
 //this must be less than 10 for all data to be displayed on 320x240. 
 //this scales display window to 256 x 192, a border of 24px all around
-uint16_t mnThermalPixelWidth = 8;
-uint16_t mnThermalPixelHeight = 8;
-uint8_t mnCameraDisplayStartX = 32;
-uint8_t mnCameraDisplayStartY = 24;
+// if thermal camera is rotated 90 degrees, can change thermal to square viewport
+// portrait hardware could be overall benefit, with viewport 216x216 (24*9)
+uint16_t mnThermalPixelWidth = THERMAL_CAMERA_PORTRAIT == 1 ? 9 : 8;
+uint16_t mnThermalPixelHeight = THERMAL_CAMERA_PORTRAIT == 1 ? 9 : 8;
+uint8_t mnCameraDisplayStartX = THERMAL_CAMERA_PORTRAIT == 1 ? 52 : 32;
+uint8_t mnCameraDisplayStartY = THERMAL_CAMERA_PORTRAIT == 1 ? 12 : 24;
+
+
 //16hz ~= 16fps
 //while this is editable, it's probably not worth the time to decode and re-encode just to convert it to the desired LCARS color scheme
 //lowest value is super dark purple: RGB 78,0,128
@@ -1987,7 +1991,7 @@ void RunThermal() {
 		return;
 	}
 		
-	//pimoroni camera "bottom" of view is section with pin holes
+	//pimoroni camera "bottom" of view is section with pin holes (small metal tab on lens barrel points down)
 	//use 10fps cap to restrict how often it tries to pull camera data, or this will block button press polling
 	//need 2 data frames for each displayed frame, as it only pulls half the range at a time.
 	if ((millis() - mnLastCameraFrame) > mnThermalCameraInterval) {		
@@ -2004,27 +2008,51 @@ void RunThermal() {
 			MLX90640_CalculateTo(arrTempFrameRaw, &moCameraParams, mfCameraEmissivity, mfTR, mfarrTempFrame);		
 		}
 		
-		for (uint8_t nRow = 0; nRow < 24; nRow++) {	
-			//need option to flip left-right of thermal camera display
-			//for (uint8_t nCol = 0; nCol < 32; nCol++) {
-			for (uint8_t nCol = 0; nCol < 32; nCol++) {				
-				float fTemp = mfarrTempFrame[nRow*32 + nCol];
-				
-				//clip temperature readings to defined range for color mapping
-				//may want to increase color fidelity to accomodate larger range?
-				fTemp = min(fTemp, MAX_CAMERA_TEMP);
-				fTemp = max(fTemp, MIN_CAMERA_TEMP); 
-				uint8_t nColorIndex = map(fTemp, MIN_CAMERA_TEMP, MAX_CAMERA_TEMP, 0, 279);
-				nColorIndex = constrain(nColorIndex, 0, 279);
-				
-				//draw the pixels
-				//need to flip this left/right. top/down shows correct, so instead of width * col we need width * (31-col)
-				//tft.fillRect((mnThermalPixelWidth * nCol) + mnCameraDisplayStartX, (mnThermalPixelHeight * nRow) + mnCameraDisplayStartY, mnThermalPixelWidth, mnThermalPixelHeight, mnarrThermalDisplayColors[nColorIndex]);
-				tft.fillRect((mnThermalPixelWidth * (31 - nCol)) + mnCameraDisplayStartX, (mnThermalPixelHeight * nRow) + mnCameraDisplayStartY, mnThermalPixelWidth, mnThermalPixelHeight, mnarrThermalDisplayColors[nColorIndex]);
+		
+		//it's more code, but higher performance to check toggle once per frame than twice per thermal "pixel"
+		if (THERMAL_CAMERA_PORTRAIT == 1) {
+			//rotate this image counter clockwise 90 deg to compensate for different hardware orientation in shell
+			//when camera rotated to portrait, clip viewport to square. 
+			for (uint8_t nRow = 0; nRow < 24; nRow++) {	
+				//need option to flip left-right of thermal camera display. cut column edges down by 4 to square off viewport
+				for (uint8_t nCol = 4; nCol < 28; nCol++) {				
+					float fTemp = mfarrTempFrame[nRow*32 + nCol];
+					
+					//clip temperature readings to defined range for color mapping
+					//may want to increase color fidelity to accomodate larger range?
+					fTemp = min(fTemp, MAX_CAMERA_TEMP);
+					fTemp = max(fTemp, MIN_CAMERA_TEMP); 
+					uint8_t nColorIndex = map(fTemp, MIN_CAMERA_TEMP, MAX_CAMERA_TEMP, 0, 279);
+					nColorIndex = constrain(nColorIndex, 0, 279);
+					
+					//draw the pixels
+					//need to flip this left/right. top/down shows correct, so instead of width * col we need width * (31-col)
+					//need to swap x and y values to "rotate" camera viewport 90 degrees counter clockwise
+					tft.fillRect((mnThermalPixelHeight * nRow) + mnCameraDisplayStartY, (mnThermalPixelWidth * (31 - nCol)) + mnCameraDisplayStartX, mnThermalPixelWidth, mnThermalPixelHeight, mnarrThermalDisplayColors[nColorIndex]);
+				}
+			}
+		} else {
+			for (uint8_t nRow = 0; nRow < 24; nRow++) {	
+				//for (uint8_t nCol = 0; nCol < 32; nCol++) {
+				for (uint8_t nCol = 0; nCol < 32; nCol++) {				
+					float fTemp = mfarrTempFrame[nRow*32 + nCol];
+					
+					//clip temperature readings to defined range for color mapping
+					//may want to increase color fidelity to accomodate larger range?
+					fTemp = min(fTemp, MAX_CAMERA_TEMP);
+					fTemp = max(fTemp, MIN_CAMERA_TEMP); 
+					uint8_t nColorIndex = map(fTemp, MIN_CAMERA_TEMP, MAX_CAMERA_TEMP, 0, 279);
+					nColorIndex = constrain(nColorIndex, 0, 279);
+					
+					//draw the pixels
+					//need to flip this left/right. top/down shows correct, so instead of width * col we need width * (31-col)
+					//tft.fillRect((mnThermalPixelWidth * nCol) + mnCameraDisplayStartX, (mnThermalPixelHeight * nRow) + mnCameraDisplayStartY, mnThermalPixelWidth, mnThermalPixelHeight, mnarrThermalDisplayColors[nColorIndex]);
+					tft.fillRect((mnThermalPixelWidth * (31 - nCol)) + mnCameraDisplayStartX, (mnThermalPixelHeight * nRow) + mnCameraDisplayStartY, mnThermalPixelWidth, mnThermalPixelHeight, mnarrThermalDisplayColors[nColorIndex]);
+				}
 			}
 		}
-		mnLastCameraFrame = millis();
 		
+		mnLastCameraFrame = millis();		
 	}
 }
 
