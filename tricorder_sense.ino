@@ -14,6 +14,7 @@
 #include <MLX90640_API.h>
 #include <MLX90640_I2C_Driver.h>
 #include <Adafruit_LIS3MDL.h>	//magnetometer, for door close detection
+#include <Adafruit_LSM6DS33.h>
 
 //full arduino pinout for this board is here:
 /*https://github.com/adafruit/Adafruit_nRF52_Arduino/blob/master/variants/feather_nrf52840_sense/variant.h*/
@@ -78,14 +79,14 @@
 #define DEVICE_VERSION			"0.94"
 //theme definition: 0 = TNG, 1 = DS9, 2 = VOY
 #define UX_THEME	(0)
-#define THERMAL_CAMERA_PORTRAIT		(0)
+#define THERMAL_CAMERA_PORTRAIT		(1)
 
 //uncomment this line to have raw magnetometer z value displayed on home screen
 //#define MAGNET_DEBUG	(0)
 //the -700 threshold was based on resolution of 10, or 1024 max
 //-20000 is based on the analog resolution required by battery pin (-32768 to 32768 range)
 //this is intended for the z index reading of magnetometer (negative means field is below the board)
-int mnMagnetSleepThreshold = -20000;
+int mnMagnetSleepThreshold = -28000;
 
 #if UX_THEME == 0
 	// TNG colors here
@@ -323,11 +324,11 @@ unsigned long mnLastCameraFrame = 0;
 //this scales display window to 256 x 192, a border of 24px all around
 // if thermal camera is rotated 90 degrees, can change thermal to square viewport
 // portrait hardware could be overall benefit, with viewport 216x216 (24*9)
-uint16_t mnThermalPixelWidth = THERMAL_CAMERA_PORTRAIT == 1 ? 9 : 8;
-uint16_t mnThermalPixelHeight = THERMAL_CAMERA_PORTRAIT == 1 ? 9 : 8;
-uint8_t mnCameraDisplayStartX = THERMAL_CAMERA_PORTRAIT == 1 ? 52 : 32;
-uint8_t mnCameraDisplayStartY = THERMAL_CAMERA_PORTRAIT == 1 ? 12 : 24;
-
+uint16_t mnThermalPixelWidth = (THERMAL_CAMERA_PORTRAIT == 1) ? 9 : 8;
+uint16_t mnThermalPixelHeight = (THERMAL_CAMERA_PORTRAIT == 1) ? 9 : 8;
+uint8_t mnCameraDisplayStartX = (THERMAL_CAMERA_PORTRAIT == 1) ? 52 : 32;
+uint8_t mnCameraDisplayStartY = (THERMAL_CAMERA_PORTRAIT == 1) ? 12 : 24;
+//uint8_t mnCameraDisplayStartY = 0;
 
 //16hz ~= 16fps
 //while this is editable, it's probably not worth the time to decode and re-encode just to convert it to the desired LCARS color scheme
@@ -444,13 +445,16 @@ void setup() {
 	mbMicrophoneStarted = PDM.begin(1, MIC_SAMPLERATE);
 	PDM.end();
 	
+	mbMagnetometer = oMagneto.begin_I2C();
+	
 	//all magnet settings - data rate of 1.25Hz a bit faster than 1 per second
-	oMagneto.setPerformanceMode(LIS3MDL_LOWPOWERMODE);
+	oMagneto.setPerformanceMode(LIS3MDL_MEDIUMMODE);
+	oMagneto.setOperationMode(LIS3MDL_CONTINUOUSMODE);
 	//oMagneto.setIntThreshold(500);
 	//can be 4, 8, 12, 16 - don't need high range here, as magnet in door will be pretty strong and very close
-	oMagneto.setRange(LIS3MDL_RANGE_4_GAUSS);
-	
-	mbMagnetometer = oMagneto.begin_I2C();
+	oMagneto.setRange(LIS3MDL_RANGE_8_GAUSS);
+	/*oMagneto.configInterrupt(false, false, true, true, false, true);
+	*/
 	
 	SetThermalClock();
 	uint16_t oCameraParams[834];
@@ -514,7 +518,7 @@ void loop() {
 		if ((millis() - mnLastMagnetCheck) > mnMagnetInterval) {
 			oMagneto.read();
 			//magnet function modification needs to use a massive drop as the sleep trigger.
-			int nCurrentMagnetZ = oMagneto.z;
+			int nCurrentMagnetZ = oMagneto.y;
 						
 			if (!mbSleepMode && (nCurrentMagnetZ < mnMagnetSleepThreshold)) {
 				SleepMode();
@@ -643,6 +647,7 @@ void RunNeoPixelColor(int nPin) {
 			} else {
 				int nBattMap = GetBatteryTier();
 				switch (nBattMap) {
+					case 5: ledPwrStrip.setPixelColor(0, 0, 0, 128); break;
 					case 4: ledPwrStrip.setPixelColor(0, 0, 0, 128); break;
 					case 3: ledPwrStrip.setPixelColor(0, 0, 128, 0); break;
 					case 2: ledPwrStrip.setPixelColor(0, 112, 128, 0); break;
@@ -721,6 +726,7 @@ void RunNeoPixelColor(int nPin) {
 					int nBattMapBoard = GetBatteryTier();
 					//cycle order = blue, green, yellow, orange, red
 					switch (nBattMapBoard) {
+						case 5: ledBoard.setPixelColor(0, 0, 0, 128); break;
 						case 4: ledBoard.setPixelColor(0, 0, 0, 128); break;
 						case 3: ledBoard.setPixelColor(0, 0, 128, 0); break;
 						case 2: ledBoard.setPixelColor(0, 112, 128, 0); break;
@@ -1123,8 +1129,9 @@ void RunHome() {
 		//output raw data to screen - test this with magnet behind 4mm of PLA ~
 		//drawParamText(250, 25, (String)oMagneto.x, color_MAINTEXT);
 		//drawParamText(250, 50, (String)oMagneto.y, color_MAINTEXT);
-		tft.fillRect(250, 60, 40, 20, ST77XX_BLACK);
-		drawParamText(250, 75, (String)oMagneto.z, color_MAINTEXT);
+		tft.fillRect(250, 45, 40, 35, ST77XX_BLACK);
+		//drawParamText(250, 55, (String)oMagneto.x, color_MAINTEXT);
+		drawParamText(250, 75, (String)oMagneto.y, color_MAINTEXT);
 		mnLastMagnetCheck = nNowMillis;
 	}
 	//#endif
@@ -1398,6 +1405,8 @@ void ShowBatteryLevel(int nPosX, int nPosY, uint16_t nLabelColor, uint16_t nValu
 	//sBatteryStatus = "      " + String((int)fBattV);
 	sBatteryStatus = String(nBattPct);
 	drawParamText(nPosX + GetBuffer(nBattPct), nPosY, const_cast<char*>(sBatteryStatus.c_str()), color_MAINTEXT);	
+	//float sRawVolt = (analogRead(VOLT_PIN) * 7.2) / 1024;
+	//drawParamText(nPosX + GetBuffer(nBattPct), nPosY, String(sRawVolt), color_MAINTEXT);
 }
 
 uint8_t GetBatteryTier() {
@@ -2028,7 +2037,7 @@ void RunThermal() {
 					//draw the pixels
 					//need to flip this left/right. top/down shows correct, so instead of width * col we need width * (31-col)
 					//need to swap x and y values to "rotate" camera viewport 90 degrees counter clockwise
-					tft.fillRect((mnThermalPixelHeight * nRow) + mnCameraDisplayStartY, (mnThermalPixelWidth * (31 - nCol)) + mnCameraDisplayStartX, mnThermalPixelWidth, mnThermalPixelHeight, mnarrThermalDisplayColors[nColorIndex]);
+					tft.fillRect((mnThermalPixelHeight * nRow) + mnCameraDisplayStartX, (mnThermalPixelWidth * (nCol - 4)) + mnCameraDisplayStartY, mnThermalPixelWidth, mnThermalPixelHeight, mnarrThermalDisplayColors[nColorIndex]);
 				}
 			}
 		} else {
