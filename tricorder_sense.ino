@@ -590,6 +590,7 @@ void SleepMode() {
 	mbTempActive = false;	
 	mbThermalActive = false;
 	mbTomServoActive = false;
+	mbMicrophoneActive = false;
 	mnCurrentServoGraphPoint = 0;
 	mnServoLastDraw = 0;
 	SetActiveNeoPixelButton(0);
@@ -1428,9 +1429,9 @@ uint8_t GetBatteryPercent() {
 	//3.2 to 4.2 => subtract 3.2 (0) from current voltage. now values should be in range of 0-0.9 : multiply by 1.111, then by 100, convert result to int.
 	//fBattV -= 3.2;	
 	//convert voltage to a percentage
-	//fBattV = fBattV * 100;
-	fBattV = constrain(fBattV, 3.20, 4.20);
-	int nBattPct = map(fBattV, 3.20, 4.20, 0, 100);
+	fBattV = fBattV * 100;
+	fBattV = constrain(fBattV, 320, 420);
+	int nBattPct = map(fBattV, 320, 420, 0, 100);
 	return nBattPct;
 }
 
@@ -1830,7 +1831,7 @@ void RunMicrophone() {
 			//dbValue = 20 * log10(GetPDMWave(4000) / 1500);
 			//drawParamText(198, 48, String(dbValue), color_MAINTEXT);
 			
-			if ((dbValue > mnMaxDBValue) || mbMicMaxRefresh) {
+			if ((dbValue > mnMaxDBValue)) || mbMicMaxRefresh) {
 				tft.fillRect(201, 32, 22, 18, ST77XX_BLACK);
 				if (!mbMicMaxRefresh) {
 					mnMaxDBValue = dbValue;
