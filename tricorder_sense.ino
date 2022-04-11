@@ -1411,7 +1411,7 @@ void ShowBatteryLevel(int nPosX, int nPosY, uint16_t nLabelColor, uint16_t nValu
 	//this is a glitch of adafruit GFX library - it thinks display is 240x320 despite the rotation in setup() and setting for text wrap
 	//sBatteryStatus = "      " + String((int)fBattV);
 	sBatteryStatus = String(nBattPct);
-	drawParamText(nPosX + GetBuffer(nBattPct), nPosY, const_cast<char*>(sBatteryStatus.c_str()), color_MAINTEXT);	
+	drawParamText(nPosX + GetBuffer(nBattPct), nPosY, sBatteryStatus, color_MAINTEXT);	
 	//float sRawVolt = (analogRead(VOLT_PIN) * 7.2) / 1024;
 	//drawParamText(nPosX + GetBuffer(nBattPct), nPosY, String(sRawVolt), color_MAINTEXT);
 }
@@ -1420,7 +1420,7 @@ uint8_t GetBatteryTier() {
 	//int nBattPct = map(fBattV, 320, 420, 0, 100);
 	int nBattPct = GetBatteryPercent();
 	//divide by 20 converts the % to a number 0-4. we have 5 total colors for conveying battery level.
-	return nBattPct / 20;	
+	return (nBattPct / 20);	
 }
 
 uint8_t GetBatteryPercent() {
@@ -1837,7 +1837,7 @@ void RunMicrophone() {
 			//dbValue = 20 * log10(GetPDMWave(4000) / 1500);
 			//drawParamText(198, 48, String(dbValue), color_MAINTEXT);
 			
-			if ((dbValue > mnMaxDBValue)) || mbMicMaxRefresh) {
+			if ((dbValue > mnMaxDBValue) || mbMicMaxRefresh) {
 				tft.fillRect(201, 32, 22, 18, ST77XX_BLACK);
 				
 				if (mnLastMicRead > 0) {
