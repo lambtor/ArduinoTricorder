@@ -529,7 +529,13 @@ void loop() {
 		}
 	#endif
 	
-	if (mbSleepMode) return;
+	if (mbSleepMode) {
+		if (ledPwrStrip.getPixelColor(1) != ST77XX_BLACK) {
+			ledPwrStrip.clear();
+			ledPwrStrip.show();
+		}
+		return;
+	}
 	
 	//toggle climate
 	oButton1.read();
@@ -1833,13 +1839,16 @@ void RunMicrophone() {
 			
 			if ((dbValue > mnMaxDBValue)) || mbMicMaxRefresh) {
 				tft.fillRect(201, 32, 22, 18, ST77XX_BLACK);
-				if (!mbMicMaxRefresh) {
-					mnMaxDBValue = dbValue;
-					//mnMaxDBValue = 120;
-				}
-				drawParamText(201 + GetBuffer(mnMaxDBValue), 48, String(mnMaxDBValue), color_MAINTEXT);
 				
-				mbMicMaxRefresh = false;
+				if (mnLastMicRead > 0) {
+					if (!mbMicMaxRefresh) {
+						mnMaxDBValue = dbValue;
+						//mnMaxDBValue = 120;
+					}
+					drawParamText(201 + GetBuffer(mnMaxDBValue), 48, String(mnMaxDBValue), color_MAINTEXT);
+				
+					mbMicMaxRefresh = false;
+				}
 			}
 			mnLastMicRead = millis();
 		}
