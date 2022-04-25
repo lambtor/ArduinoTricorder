@@ -7,7 +7,7 @@ WIP: list of digital assets that could be used with arduino tricorder
 <li><strong>Climate Scanner:</strong>		   OK - updates bar graphs to reflect data without requiring internal loops</li>
 <li><strong>Left-side LED: </strong>        OK, stacks on color scanner mode</li>
 <li><strong>Power LED:</strong>             Functional, will either cycle colors or show color based on battery power %</li>
-<li><strong>Button Support:</strong>        OK - using easybutton library pulled from elsewhere on github</li>
+<li><strong>Button Support:</strong>        OK - using easybutton library pulled from elsewhere on github (see bottom of this readme)</li>
 <li><strong>Microphone Spectrum <br/>
 Visualization:</strong>         OK - not the most accurate thing, but has a very high refresh rate.  Uses AdafruitZero_FFT library for FFT calculations.</li>
 <li><strong>Thermal camera:</strong>       OK</li>
