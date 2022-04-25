@@ -20,10 +20,13 @@ door close to sleep:</strong>  OK</li>
 change via <br/>
 potentiometer:</strong>  OK</li> 
 	<li><strong>Neopixels above buttons:</strong>	OK - set #define NEOPIXEL_LED_COUNT 3 if you only have PWR / EMRG / ID wired up </li>
-	<li><strong>Tom Servo Mode:</strong> 	OK - repeating, "canned" animation</li>
+	<li><strong>Tom Servo Mode:</strong> 	OK - repeating "canned" animation</li>
   </ul>
 <br/>
-Draw operations on the display from the arduino aren't that fast.  The FFT draw code calculates a list of bar heights, then uses fillRect() to create the bars.  At the end of the bar drawing operations, these bar heights are stored in a "previous" bar height array.  From that point on, each bar draw operation calculates the difference between "new" bar heights and "previous".  If "new" is larger than "previous", it only draws enough to extend the "previous" height to the "new" one.  If "new" is less than "previous", it draws black lines to shorten the "previous" height down to the "new" one.  This relative display update method removes the use of a full screen blank operation, and minimizes flickering.<br/>
+Draw operations on the display from the arduino typically aren't that fast.  The FFT draw code calculates a list of bar heights, then uses fillRect() to create the bars.  At the end of the bar drawing operations, these bar heights are stored in a "previous" bar height array.  From that point on, each bar draw operation calculates the difference between "new" bar heights and "previous".  If "new" is larger than "previous", it only draws enough to extend the "previous" height to the "new" one.  If "new" is less than "previous", it draws black lines to shorten the "previous" height down to the "new" one.  This relative display update method removes the use of a full screen blank operation, and minimizes flickering.<br/>
+<br/>
+<br/>
+All 3d models for shell are available on <a href="https://www.printables.com/model/128500-star-trek-next-generation-tricorder-tr-580-v1-ardu">printables</a> or <a href="https://www.thingiverse.com/thing:5199642">thingiverse</a>. Printables has latest version with USB-C breakout plug at top of body "hat".
 <br/>
 Refrences used:<br/>
 <a href="https://github.com/adafruit/Adafruit_nRF52_Arduino/blob/master/variants/feather_nrf52840_sense/variant.h">Adafruit board pinout map</a><br/>
