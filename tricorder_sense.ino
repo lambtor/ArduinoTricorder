@@ -515,7 +515,7 @@ void loop() {
 	
 	//need tests with speaker above and door magnet below - may require testing within assembled shell
 	#if !defined(MAGNET_DEBUG)
-		if ((millis() - mnLastMagnetCheck) > mnMagnetInterval) {
+		if (mbMagnetometer && (millis() - mnLastMagnetCheck) > mnMagnetInterval) {
 			oMagneto.read();
 			//magnet function modification needs to use a massive drop as the sleep trigger.
 			int nCurrentMagnetZ = oMagneto.y;
