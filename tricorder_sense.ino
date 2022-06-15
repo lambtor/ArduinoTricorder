@@ -2,7 +2,8 @@
 #include <SPI.h>
 #include <Adafruit_GFX.h>    	// Core graphics library
 #include <Adafruit_ST7789.h> 	// Hardware-specific library for ST7789
-#include <string.h>
+//#include <string.h>
+#include <ArduinoJson.h>
 #include <Adafruit_APDS9960.h>	//RGB, light, proximity, gesture sensor
 #include <Wire.h>
 #include <EasyButton.h>
@@ -15,6 +16,7 @@
 #include <MLX90640_I2C_Driver.h>
 #include <Adafruit_LIS3MDL.h>	//magnetometer, for door close detection
 #include <Adafruit_LSM6DS33.h>
+
 
 //full arduino pinout for this board is here:
 /*https://github.com/adafruit/Adafruit_nRF52_Arduino/blob/master/variants/feather_nrf52840_sense/variant.h*/
@@ -1314,9 +1316,9 @@ void RunRGBSensor() {
 		//uncomment this when need to display HSL conversion
 		RGBtoHSL((double)nRed, (double)nGreen, (double)nBlue, arrdHSL);
 		//display HSL values
-		drawParamText(203 + GetBuffer(arrdHSL[0]), 48, const_cast<char*>(TruncateDouble(arrdHSL[0]).c_str()), color_MAINTEXT);
-		drawParamText(203 + GetBuffer(arrdHSL[1]), 74, const_cast<char*>(TruncateDouble(arrdHSL[1]).c_str()), color_MAINTEXT);
-		drawParamText(203 + GetBuffer(arrdHSL[2]), 99, const_cast<char*>(TruncateDouble(arrdHSL[2]).c_str()), color_MAINTEXT);
+		drawParamCharText(203 + GetBuffer(arrdHSL[0]), 48, const_cast<char*>(TruncateDouble(arrdHSL[0]).c_str()), color_MAINTEXT);
+		drawParamCharText(203 + GetBuffer(arrdHSL[1]), 74, const_cast<char*>(TruncateDouble(arrdHSL[1]).c_str()), color_MAINTEXT);
+		drawParamCharText(203 + GetBuffer(arrdHSL[2]), 99, const_cast<char*>(TruncateDouble(arrdHSL[2]).c_str()), color_MAINTEXT);
 		
 		uint16_t nRGB565 = RGBto565((uint16_t)arrdRGB[0], (uint16_t)arrdRGB[1], (uint16_t)arrdRGB[2]);
 		//use strings for all basic text, and only when outputting to screen, convert to char*
@@ -1338,11 +1340,11 @@ void RunRGBSensor() {
 		}
 		//print HTML, RGB565			
 		strTemp.toUpperCase();
-		drawParamText(185, 176, const_cast<char*>(strTemp.c_str()), color_MAINTEXT);
+		drawParamCharText(185, 176, const_cast<char*>(strTemp.c_str()), color_MAINTEXT);
 		strTemp = String(nRGB565, HEX);
 		strTemp.toUpperCase();
 		strTemp = "0x" + strTemp;
-		drawParamText(185, 150, const_cast<char*>(strTemp.c_str()), color_MAINTEXT);
+		drawParamCharText(185, 150, const_cast<char*>(strTemp.c_str()), color_MAINTEXT);
 		
 		//CMYK conversion formulas assume all RGB are between 0-1.0
 		//this should use CMYK function
@@ -1359,16 +1361,16 @@ void RunRGBSensor() {
 		
 		double dblack = (1 - ThreewayMax(fRed, fGreen, fBlue));
 		
-		drawParamText(78 + GetBuffer(dblack *100), 228, const_cast<char*>(TruncateDouble(dblack * 100).c_str()), color_MAINTEXT);
+		drawParamCharText(78 + GetBuffer(dblack *100), 228, const_cast<char*>(TruncateDouble(dblack * 100).c_str()), color_MAINTEXT);
 		//use rgb array for cmy to minimize memory use
 		// red -> magenta, green -> yellow, blue -> cyan
 		arrdRGB[0] = ((1 - fGreen - dblack) / (1 - dblack)) * 100;
 		arrdRGB[2] = ((1 - fRed - dblack) / (1 - dblack)) * 100;
 		arrdRGB[1] = ((1 - fBlue - dblack) / (1 - dblack)) * 100; 
 		
-		drawParamText(78 + GetBuffer(arrdRGB[2]), 150, const_cast<char*>(TruncateDouble(arrdRGB[2]).c_str()), color_MAINTEXT);
-		drawParamText(78 + GetBuffer(arrdRGB[0]), 176, const_cast<char*>(TruncateDouble(arrdRGB[0]).c_str()), color_MAINTEXT);
-		drawParamText(78 + GetBuffer(arrdRGB[1]), 202, const_cast<char*>(TruncateDouble(arrdRGB[1]).c_str()), color_MAINTEXT);	
+		drawParamCharText(78 + GetBuffer(arrdRGB[2]), 150, const_cast<char*>(TruncateDouble(arrdRGB[2]).c_str()), color_MAINTEXT);
+		drawParamCharText(78 + GetBuffer(arrdRGB[0]), 176, const_cast<char*>(TruncateDouble(arrdRGB[0]).c_str()), color_MAINTEXT);
+		drawParamCharText(78 + GetBuffer(arrdRGB[1]), 202, const_cast<char*>(TruncateDouble(arrdRGB[1]).c_str()), color_MAINTEXT);	
 					
 		//draw swatch, turn off scanner LED
 		tft.fillRoundRect(186, 189, 113, 42, 21, nRGB565);
@@ -1392,7 +1394,7 @@ void RunRGBSensor() {
 			mnRGBCooldown = nCurrentRGBCooldown;
 			tft.fillRect(37, 55, 7, 18, color_HEADER);
 			if (mnRGBCooldown > 0) {
-				drawParamText(37, 71, const_cast<char*>(((String)mnRGBCooldown).c_str()), ST77XX_BLACK);
+				drawParamCharText(37, 71, const_cast<char*>(((String)mnRGBCooldown).c_str()), ST77XX_BLACK);
 			}
 		}
 		//if board led lit, turn it off
@@ -1605,10 +1607,10 @@ void RunClimateSensor() {
 			//slash last character from string
 			sTempC.remove(sTempC.length() - 1);
 			//celsius
-			drawParamText(86, 46, const_cast<char*>(sTempC.c_str()), color_MAINTEXT);
+			drawParamCharText(86, 46, const_cast<char*>(sTempC.c_str()), color_MAINTEXT);
 			//kelvin - int, should always be 3 digits - this is a straight conversion
 			int nTempK = (int)(fTempC + 273.15);
-			drawParamText(90, 72, const_cast<char*>(((String)nTempK).c_str()), color_MAINTEXT);
+			drawParamCharText(90, 72, const_cast<char*>(((String)nTempK).c_str()), color_MAINTEXT);
 			
 			//map values to bar graph, store plotted value so future plots can shave or append
 			//map range is from labels to max width of bar [308-61]
@@ -1626,9 +1628,9 @@ void RunClimateSensor() {
 			//slash last character from string
 			sHumid.remove(sHumid.length() - 1);
 			
-			drawParamText(204, 46, const_cast<char*>(sHumid.c_str()), color_MAINTEXT);
+			drawParamCharText(204, 46, const_cast<char*>(sHumid.c_str()), color_MAINTEXT);
 			//barometric pressure - maximum human survivable is ~ 70*14.7 psi ~= 70000 millibar (sea diving)
-			drawParamText(202 + Get1KBuffer(mnBarom), 72, const_cast<char*>(((String)nBarom).c_str()), color_MAINTEXT);
+			drawParamCharText(202 + Get1KBuffer(mnBarom), 72, const_cast<char*>(((String)nBarom).c_str()), color_MAINTEXT);
 			
 			//set temp, current values for bar graph function
 			mnHumidTargetBar = map(mfHumid, 0, 100, 0, 247);
@@ -2184,7 +2186,7 @@ String PrintHex16(uint16_t *data) {
 	return (String)tmp;
 }
 
-void drawParamText(uint8_t nPosX, uint8_t nPosY, char *sText, uint16_t nColor) {
+void drawParamCharText(uint8_t nPosX, uint8_t nPosY, char *sText, uint16_t nColor) {
 	tft.setCursor(nPosX, nPosY);
 	tft.setTextColor(nColor);
 	tft.setTextWrap(true);
