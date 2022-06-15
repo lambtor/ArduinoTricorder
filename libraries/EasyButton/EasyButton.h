@@ -13,6 +13,7 @@
 
 #define EASYBUTTON_READ_TYPE_INTERRUPT 0
 #define EASYBUTTON_READ_TYPE_POLL 1
+#define NOT_AN_INTERRUPT -1
 
 class EasyButton : public EasyButtonBase
 {
