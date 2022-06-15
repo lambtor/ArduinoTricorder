@@ -2,8 +2,7 @@
 #include <SPI.h>
 #include <Adafruit_GFX.h>    	// Core graphics library
 #include <Adafruit_ST7789.h> 	// Hardware-specific library for ST7789
-//#include <string.h>
-#include <ArduinoJson.h>
+#include <string.h>
 #include <Adafruit_APDS9960.h>	//RGB, light, proximity, gesture sensor
 #include <Wire.h>
 #include <EasyButton.h>
