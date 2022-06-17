@@ -36,6 +36,7 @@ Refrences used:<br/>
 
 ![board pinout](https://github.com/lambtor/ArduinoTricorder/blob/master/tricorderV10-pinoutLT.png)
 
+![PCB Headers](https://github.com/lambtor/ArduinoTricorder/blob/master/customPCBs.JPG)
 
 Reference of all parts used in build demoed on youtube:<br/>
 
