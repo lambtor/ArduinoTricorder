@@ -7,6 +7,10 @@
 
 #include "EasyButton.h"
 
+#if !defined(NOT_AN_INTERRUPT)
+	#define NOT_AN_INTERRUPT -1
+#endif
+
 void EasyButton::begin()
 {
 	pinMode(_pin, _pu_enabled ? INPUT_PULLUP : INPUT);
