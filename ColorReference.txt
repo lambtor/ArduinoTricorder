@@ -66,3 +66,31 @@ active toggled button:
 #FFCC66		255,244,122     0xFFAF
 main window title text:
 #FFCC66		255,244,122     0xFFAF
+
+/* NEMESIS */
+main window title text / large swoop 1:
+81,97,244   #5161F4 
+
+main text color: 
+190,196,248	  #B3C4F8
+
+data labels:
+124,127,234	  #7C7FEA
+
+greenish blue	/ button1
+153,180,175	  #99B4AF
+
+subwindow frames 2:
+160,95,93	  #A05F5D
+
+active toggled button:
+229,247,251   #E5F7FB
+
+also uses red alert yellow as highlight 3
+
+/* universal colors */
+button 3 tan / universal tan:
+196,187,147	#C4BB93
+
+universal purple:
+204,174,220   #CCAEDC
