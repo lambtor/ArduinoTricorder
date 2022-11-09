@@ -70,23 +70,32 @@ main window title text:
 /* NEMESIS */
 main window title text / large swoop 1:
 81,97,244   #5161F4 
-
 main text color: 
 190,196,248	  #B3C4F8
-
 data labels:
 124,127,234	  #7C7FEA
-
 greenish blue	/ button1
 153,180,175	  #99B4AF
-
 subwindow frames 2:
 160,95,93	  #A05F5D
-
 active toggled button:
 229,247,251   #E5F7FB
 
 also uses red alert yellow as highlight 3
+
+/* LD - OPS */
+main text:
+241,240,192	#F1F0C0
+swoop:
+244,197,50	#F4C532
+data labels:
+228,175,121	#E4AF79
+subwindow frames:
+250,225,70	#FAE146
+active toggle button:
+255,173,89	#FFAD59
+main window title text:
+241,240,192	#F1F0C0
 
 /* universal colors */
 button 3 tan / universal tan:
