@@ -77,7 +77,7 @@
 //#define LED_BLUE					4
 
 //system os version #. max 3 digits
-#define DEVICE_VERSION			"0.94"
+#define DEVICE_VERSION			"0.96"
 //theme definition: 0 = TNG, 1 = DS9, 2 = VOY
 #define UX_THEME	(0)
 #define THERMAL_CAMERA_PORTRAIT		(1)
@@ -133,7 +133,6 @@ int mnMagnetSleepThreshold = -28000;
 	#define color_FFT				0xDEB5
 #endif
 
-
 #define color_REDLABELTEXT		0xE000
 #define color_REDDARKLABELTEXT	0x9800
 #define color_REDDATATEXT		0xDEFB
@@ -141,7 +140,6 @@ int mnMagnetSleepThreshold = -28000;
 //use labeltext3 for servo ltpurple
 #define color_SERVOPINK			0xFE18
 #define color_SERVOPURPLE		0x83B7
-
 
 #define RGBto565(r,g,b) ((((r) & 0xF8) << 8) | (((g) & 0xFC) << 3) | ((b) >> 3))
 
@@ -161,14 +159,14 @@ bool mbCyclePowerColor = false;
 bool mbCycleBoardColor = false;
 int mnBoardColor = 4;
 //power interval doesn't need to check more than every 30 seconds
-int mnPowerLEDInterval = 30000;
-int mnIDLEDInterval = 1000;
+unsigned long mnPowerLEDInterval = 30000;
+unsigned long mnIDLEDInterval = 1000;
 unsigned long mnLastUpdateIDLED = 0;
 int mnCurrentProfileRed = 0;
 int mnCurrentProfileGreen = 0;
 int mnCurrentProfileBlue = 0;
 String msCurrentProfileName = "";
-int mnEMRGLEDInterval = 110;
+unsigned long mnEMRGLEDInterval = 110;
 int mnEMRGMinStrength = 8;
 int mnEMRGMaxStrength = 212;
 int mnEMRGCurrentStrength = 8;
@@ -176,16 +174,16 @@ bool mbLEDIDSet = false;
 unsigned long mnLastUpdatePower = 0;
 unsigned long mnLastUpdateEMRG = 0;
 bool mbEMRGdirection = false;
-int mnBoardLEDInterval = 5000;
+unsigned long mnBoardLEDInterval = 5000;
 unsigned long mnLastUpdateBoard = 0;
 
 //left scanner leds
-int mnLeftLEDInterval = 200;
+unsigned long mnLeftLEDInterval = 200;
 int mnLeftLEDCurrent = 0;
 unsigned long mnLastUpdateLeftLED = 0;
 
-int mnBoardRedLEDInterval = 350;
-int mnBoardBlueLEDInterval = 250;
+unsigned long mnBoardRedLEDInterval = 350;
+unsigned long mnBoardBlueLEDInterval = 250;
 unsigned long mnLastUpdateBoardRedLED = 0;
 unsigned long mnLastUpdateBoardBlueLED = 0;
 bool mbBoardRedLED = false;
@@ -201,8 +199,8 @@ const uint16_t mnThermalCameraLabels[] = {0xD6BA,0xC0A3,0xD541,0xD660,0x9E02,0x0
 //color sensor
 bool mbColorInitialized = false;
 bool mbRGBActive = false;
-int mnRGBScanInterval = 5000;
-int mnRGBCooldown = 0;
+unsigned long mnRGBScanInterval = 5000;
+unsigned long mnRGBCooldown = 0;
 unsigned long mnLastRGBScan = 0;
 
 //temperature, humidity, pressure
@@ -214,7 +212,7 @@ float mfTempC = 0.0;
 float mfTempK = 0.0;
 float mfHumid = 0.0;
 int mnBarom = 0;
-int mnClimateScanInterval = 2000;
+unsigned long mnClimateScanInterval = 2000;
 int mnClimateCooldown = 0;
 int mnTempTargetBar = 0;
 int mnTempCurrentBar = 0;
@@ -236,7 +234,7 @@ unsigned long mnLastClimateScan = 0;
 
 bool mbHomeActive = false;
 unsigned long mnLastUpdateHome = 0;
-int mnHomeUpdateInterval = 1000;
+unsigned long mnHomeUpdateInterval = 1000;
 bool mbMicrophoneStarted = false;
 bool mbMicrophoneActive = false;
 bool mbMicrophoneRedraw = false;
@@ -277,7 +275,7 @@ int mnMaxDBValue = 0;
 
 unsigned long mnLastMicRead = 0;
 //decibel estimation every 3 seconds
-int mnMicReadInterval = 3000;
+unsigned long mnMicReadInterval = 3000;
 short mCurrentMicDisplay[FFT_BINCOUNT] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 short mTargetMicDisplay[FFT_BINCOUNT] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 
@@ -297,18 +295,19 @@ bool mbSleepMode = false;
 Adafruit_LIS3MDL oMagneto;
 bool mbMagnetometer = false;
 float mfMagnetX, mfMagnetY, mfMagnetz;
-int mnLastMagnetCheck = 0;
-int mnMagnetInterval = 2000;
+unsigned long mnLastMagnetCheck = 0;
+unsigned long mnMagnetInterval = 2000;
 //if this cutoff is not working, either change where your speaker sits in the shell or add another magnet to your door to force the z-drop
-int mnLastMagnetValue = 0;
+unsigned long mnLastMagnetValue = 0;
 
 //Adafruit_MLX90640 oThermalCamera;
 const uint8_t mbCameraAddress = 0x33;
 paramsMLX90640 moCameraParams;
 #define TA_SHIFT 8
 //temperature cutoffs are given in celsius. -12C => -10F
-int MIN_CAMERA_TEMP = 20;
-int MAX_CAMERA_TEMP = 35;
+//old cutoffs -> 12C / 35C	new are 50F -> 104F
+int MIN_CAMERA_TEMP = 10;
+int MAX_CAMERA_TEMP = 40;
  
 //need array length of 768 as this is 32*24 resolution
 float mfarrTempFrame[768];
@@ -715,9 +714,9 @@ void RunNeoPixelColor(int nPin) {
 			nCurrentEMRG = nCurrentEMRG + ((mbEMRGdirection == true ? 1 : -1) * nEMRGIncrement);
 			
 			if (nCurrentEMRG > mnEMRGMaxStrength)
-				nCurrentEMRG == mnEMRGMaxStrength;
+			  nCurrentEMRG = mnEMRGMaxStrength;
 			if (nCurrentEMRG < mnEMRGMinStrength)
-				nCurrentEMRG == mnEMRGMinStrength;
+        nCurrentEMRG = mnEMRGMinStrength;
 			mnEMRGCurrentStrength = nCurrentEMRG;			
 			//ledPwrStrip.setPixelColor(2, nCurrentEMRG, 0, 0);
 			ledPwrStrip.setPixelColor(NEOPIXEL_LED_COUNT-1, nCurrentEMRG, 0, 0);
@@ -1081,8 +1080,7 @@ void GoHome() {
 	tft.drawFastVLine(278, 119, 84, ST77XX_BLACK);
 	tft.drawFastVLine(279, 119, 84, ST77XX_BLACK);
 	tft.drawFastVLine(280, 119, 84, ST77XX_BLACK);
-	tft.drawFastVLine(281, 119, 84, ST77XX_BLACK);
-			
+	tft.drawFastVLine(281, 119, 84, ST77XX_BLACK);			
 }
 
 void RunHome() {	
@@ -1299,9 +1297,9 @@ void RunRGBSensor() {
 		}
 								
 		///convert rgb to HSL
-		double arrdHSL[2];
-		double arrdHSV[2];
-		double arrdRGB[2];			
+		double arrdHSL[3];
+		//double arrdHSV[3];
+		double arrdRGB[3];			
 		
 		//displayRGB
 		drawParamText(78 + GetBuffer((double)nRed), 48, String(nRed), color_MAINTEXT);
@@ -1388,7 +1386,7 @@ void RunRGBSensor() {
 	} else {
 		//give timer until next scan?
 		//37 58		6 14
-		int nCurrentRGBCooldown = (mnRGBScanInterval / 1000) - (int)((millis() - mnLastRGBScan) / 1000);
+		unsigned long nCurrentRGBCooldown = (mnRGBScanInterval / 1000) - (int)((millis() - mnLastRGBScan) / 1000);
 		if (nCurrentRGBCooldown != mnRGBCooldown && nCurrentRGBCooldown < (mnRGBScanInterval / 1000)) {
 			mnRGBCooldown = nCurrentRGBCooldown;
 			tft.fillRect(37, 55, 7, 18, color_HEADER);
@@ -2038,13 +2036,23 @@ void RunThermal() {
 				for (uint8_t nCol = 4; nCol < 28; nCol++) {				
 					float fTemp = mfarrTempFrame[nRow*32 + nCol];
 					
+					//need way to handle dead camera pixels
+					//if value is 0, check left column value for this row. if that's not 0, use that.
+					//if value is 0 and left column value for this row also 0, check right column
+					//if right column not 0, use that
+					//right now only 1 pixel is dead > 14,24
+					if (nCol == 24 && nRow == 14) {
+						fTemp = mfarrTempFrame[(nRow-1)*32 + nCol];
+					}
+
 					//clip temperature readings to defined range for color mapping
 					//may want to increase color fidelity to accomodate larger range?
 					fTemp = min(fTemp, MAX_CAMERA_TEMP);
 					fTemp = max(fTemp, MIN_CAMERA_TEMP); 
-					uint8_t nColorIndex = map(fTemp, MIN_CAMERA_TEMP, MAX_CAMERA_TEMP, 0, 279);
-					nColorIndex = constrain(nColorIndex, 0, 279);
-					
+          
+					uint16_t nColorIndex = map(fTemp, MIN_CAMERA_TEMP, MAX_CAMERA_TEMP, 0, 279);
+					nColorIndex = constrain(nColorIndex, 0, 279);					        
+
 					//draw the pixels
 					//need to flip this left/right. top/down shows correct, so instead of width * col we need width * (31-col)
 					//need to swap x and y values to "rotate" camera viewport 90 degrees counter clockwise
@@ -2054,20 +2062,24 @@ void RunThermal() {
 		} else {
 			for (uint8_t nRow = 0; nRow < 24; nRow++) {	
 				//for (uint8_t nCol = 0; nCol < 32; nCol++) {
-				for (uint8_t nCol = 0; nCol < 32; nCol++) {				
+				for (uint8_t nCol = 0; nCol < 32; nCol++) {
 					float fTemp = mfarrTempFrame[nRow*32 + nCol];
+					
+					if (nCol == 24 && nRow == 14) {
+						fTemp = mfarrTempFrame[nRow*32 + (nCol-1)];
+					}
 					
 					//clip temperature readings to defined range for color mapping
 					//may want to increase color fidelity to accomodate larger range?
 					fTemp = min(fTemp, MAX_CAMERA_TEMP);
 					fTemp = max(fTemp, MIN_CAMERA_TEMP); 
-					uint8_t nColorIndex = map(fTemp, MIN_CAMERA_TEMP, MAX_CAMERA_TEMP, 0, 279);
-					nColorIndex = constrain(nColorIndex, 0, 279);
+					uint16_t nColorIndexH = map(fTemp, MIN_CAMERA_TEMP, MAX_CAMERA_TEMP, 0, 279);
+					nColorIndexH = constrain(nColorIndexH, 0, 279);
 					
 					//draw the pixels
 					//need to flip this left/right. top/down shows correct, so instead of width * col we need width * (31-col)
-					//tft.fillRect((mnThermalPixelWidth * nCol) + mnCameraDisplayStartX, (mnThermalPixelHeight * nRow) + mnCameraDisplayStartY, mnThermalPixelWidth, mnThermalPixelHeight, mnarrThermalDisplayColors[nColorIndex]);
-					tft.fillRect((mnThermalPixelWidth * (31 - nCol)) + mnCameraDisplayStartX, (mnThermalPixelHeight * nRow) + mnCameraDisplayStartY, mnThermalPixelWidth, mnThermalPixelHeight, mnarrThermalDisplayColors[nColorIndex]);
+					//tft.fillRect((mnThermalPixelWidth * nCol) + mnCameraDisplayStartX, (mnThermalPixelHeight * nRow) + mnCameraDisplayStartY, mnThermalPixelWidth, mnThermalPixelHeight, mnarrThermalDisplayColors[nColorIndexH]);
+					tft.fillRect((mnThermalPixelWidth * (31 - nCol)) + mnCameraDisplayStartX, (mnThermalPixelHeight * nRow) + mnCameraDisplayStartY, mnThermalPixelWidth, mnThermalPixelHeight, mnarrThermalDisplayColors[nColorIndexH]);
 				}
 			}
 		}
@@ -2110,15 +2122,16 @@ int32_t GetPDMWave(int32_t nSamples) {
 
 void RGBtoHSL(double r, double g, double b, double hsl[]) { 
 	//this assumes byte - need to divide by 255 to get byte?
-    double rd = r/255;
-    double gd = g/255;
-    double bd = b/255;
+  double rd = r/255;
+  double gd = g/255;
+  double bd = b/255;
 	//double rd = (double)r;
 	//double gd = (double)g;
 	//double bd = (double)b;
-    double max = ThreewayMax(rd, gd, bd);
-    double min = ThreewayMin(rd, gd, bd);
-    double h, s;
+  double max = ThreewayMax(rd, gd, bd);
+  double min = ThreewayMin(rd, gd, bd);
+  double h = 0;
+  double s = 0;
 	double l = (max + min) / 2;
 
     if (max == min) {
@@ -2418,14 +2431,14 @@ void UpdateClimateBarGraph(int nBarIndex, uint16_t nBarColor) {
 
 void UpdateMicrophoneGraph(short nMaxDataValue, uint16_t nBarColor) {
 	short nGraphMinX = 66;
-    short nGraphMinY = 97;
-    short nGraphZeroY = 163;
-    short nBarWidth = 13;
-    short nBarWidthMargined = 15;
-    float fBarUpdateStepFactor = 1;
-    short nTempYDifference = 0;
+  //short nGraphMinY = 97;
+  short nGraphZeroY = 163;
+  short nBarWidth = 13;
+  short nBarWidthMargined = 15;
+  //float fBarUpdateStepFactor = 1;
+  short nTempYDifference = 0;
 	//if nMaxDataValue not specified, values won't be normalized before draw action
-    //graph bars should expand up & down from center line @ nGraphZeroY
+  //graph bars should expand up & down from center line @ nGraphZeroY
 	//this function's responsibility is to draw each FFT bin bar so the current display values match the target values
 	for (int i = 0; i < FFT_BINCOUNT; i++) {
 		if (nMaxDataValue > 0) {
