@@ -154,7 +154,7 @@ Adafruit_BMP280 oTempBarom;
 Adafruit_SHT31 oHumid;
 
 //TFT backlight pin brightness, 0-255
-int mnScreenBrightness = 128;
+int mnScreenBrightness = 64;
 
 //power & board color enumerator: blue = 4, green = 3, yellow = 2, orange = 1, red = 0
 int mnPowerColor = 4;
@@ -377,6 +377,11 @@ void setup() {
 	ledPwrStrip.begin();
 	ledBoard.begin();
 	
+	delay(100);
+	//tft backlight pin
+	pinMode(TFT_BKLT, OUTPUT);
+	analogWrite(TFT_BKLT, mnScreenBrightness);
+		
 	// use this initializer for a 2.0" 320x240 TFT. technically this is a rotated 240x320, so declaration is in that order
 	tft.init(240, 320, SPI_MODE0); // Init ST7789 320x240
 	tft.setRotation(1);
@@ -400,10 +405,6 @@ void setup() {
 	//set output for board non-neopixel LEDs
 	pinMode(LED_RED, OUTPUT);
 	pinMode(LED_BLUE, OUTPUT);
-	
-	//tft backlight pin
-	//pinMode(TFT_BKLT, OUTPUT);
-	//analogWrite(TFT_BKLT, mnScreenBrightness);
 	
 	//sound trigger pin
 	pinMode(SOUND_TRIGGER_PIN, OUTPUT);
