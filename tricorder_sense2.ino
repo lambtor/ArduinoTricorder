@@ -31,6 +31,7 @@
 #define TFT_CS 						(6)
 // SD card select pin
 //#define SD_CS 			11 	//- can't use pin 4 as that is for blue connection led
+#define SD_CS				(12)
 #define TFT_BKLT						(11)
 #define TFT_RST 					-1
 #define TFT_DC 						(5)
@@ -39,6 +40,10 @@
 //pin 9 is free, as pin_a6 is for vbat and is otherwise known as digital 20
 #define VOLT_PIN 					PIN_A6		//INPUT_POWER_PIN
 #define SOUND_TRIGGER_PIN			(9)
+// set this to false if sound trigger pin should hold low the entire time sound plays
+// set this to true for trigger pin to get pulled low for 100ms then return to high
+const bool SOUND_BUTTON_TRIGGERSTYLE = false;
+bool mbSoundPlaying = false;
 
 //buttons, scroller	- d2 pin supposed to be pin #2
 //button on the board is connected to pin 7.  TX is pin 0, RX is pin 1 - these are normally used for serial communication
@@ -77,7 +82,7 @@
 //#define LED_BLUE					4
 
 //system os version #. max 3 digits
-#define DEVICE_VERSION			"0.96"
+#define DEVICE_VERSION			"0.97"
 //theme definition: 0 = TNG, 1 = DS9, 2 = VOY
 #define UX_THEME	(0)
 #define THERMAL_CAMERA_PORTRAIT		(1)
@@ -87,54 +92,74 @@
 //the -700 threshold was based on resolution of 10, or 1024 max
 //-20000 is based on the analog resolution required by battery pin (-32768 to 32768 range)
 //this is intended for the z index reading of magnetometer (negative means field is below the board)
-int mnMagnetSleepThreshold = -28000;
+int mnMagnetSleepThreshold = -29500;
 
 #if UX_THEME == 0
 	// TNG colors here
+	//241,247,153		#f7f79c
 	#define color_SWOOP				0xF7B3
+	//			#9cceff
 	#define color_MAINTEXT			0x9E7F
+	//			#c5d2ff
 	//#define color_MAINTEXT			0xC69F
+	//			#8482f7
 	#define color_LABELTEXT			0x841E
+	//	#ffdb42
 	#define color_HEADER			0xFEC8
 	#define color_TITLETEXT			0xFEC8
-	//196,187,145
+	//196,187,145		#c5ba94
 	#define color_LABELTEXT2		0xC5D2
-	//204,174,220
+	//204,174,220		#ceaede
 	#define color_LABELTEXT3		0xCD7B
+	//#efc68c
 	#define color_LABELTEXT4		0xEE31
+	//#6b4d10
 	#define color_LEGEND			0x6A62
 	//210,202,157
 	#define color_FFT				0xDEB5
 #elif UX_THEME == 1
-	// ds9
+	// DS9
+	//#d69e84
 	#define color_SWOOP			0xD4F0
+	//#bda2ce
 	#define color_MAINTEXT		0xBD19
+	//#7b516b
 	#define color_LABELTEXT		0x7A8D
+	//#ef963a
 	#define color_HEADER		0xECA7
+	//#c57d6b
 	#define color_TITLETEXT		0xC3ED
 	//to-do: find fitting options for these to mesh with ds9
-	#define color_LABELTEXT2	0xC5D2	
+	#define color_LABELTEXT2		0xC5D2	
 	#define color_LABELTEXT3		0xCD7B	
 	#define color_LABELTEXT4		0xEE31
 	#define color_LEGEND			0x6A62
 	#define color_FFT				0xDEB5
 #elif UX_THEME == 2
-	// voy
+	// VOY
+	//#9cceff
 	#define color_MAINTEXT		0x9E7F
+	//#7b86a5
 	#define color_SWOOP			0x7C34
+	//#9c9aff
 	#define color_LABELTEXT		0x9CDF
+	//#ce659c
 	#define color_HEADER		0xCB33
+	//#fff77b
 	#define color_TITLETEXT		0xFFAF
 	//to-do: find fitting options for these to mesh with voy
-	#define color_LABELTEXT2	0xC5D2
+	#define color_LABELTEXT2		0xC5D2
 	#define color_LABELTEXT3		0xCD7B
 	#define color_LABELTEXT4		0xEE31
 	#define color_LEGEND			0x6A62
 	#define color_FFT				0xDEB5
 #endif
 
+//#e60000
 #define color_REDLABELTEXT		0xE000
+//#9c0000
 #define color_REDDARKLABELTEXT	0x9800
+//#dedfde
 #define color_REDDATATEXT		0xDEFB
 
 //use labeltext3 for servo ltpurple
@@ -377,11 +402,9 @@ void setup() {
 	ledPwrStrip.begin();
 	ledBoard.begin();
 	
-	delay(100);
-	//tft backlight pin
-	pinMode(TFT_BKLT, OUTPUT);
-	analogWrite(TFT_BKLT, mnScreenBrightness);
-		
+	//would a delay help on startup to give the screen a second to handle the voltage drop on power up?
+	//delay(100);
+	
 	// use this initializer for a 2.0" 320x240 TFT. technically this is a rotated 240x320, so declaration is in that order
 	tft.init(240, 320, SPI_MODE0); // Init ST7789 320x240
 	tft.setRotation(1);
@@ -405,6 +428,10 @@ void setup() {
 	//set output for board non-neopixel LEDs
 	pinMode(LED_RED, OUTPUT);
 	pinMode(LED_BLUE, OUTPUT);
+	
+	//tft backlight pin
+	pinMode(TFT_BKLT, OUTPUT);
+	analogWrite(TFT_BKLT, mnScreenBrightness);
 	
 	//sound trigger pin
 	pinMode(SOUND_TRIGGER_PIN, OUTPUT);
@@ -532,6 +559,7 @@ void loop() {
 			int nCurrentMagnetZ = oMagneto.y;
 						
 			if (!mbSleepMode && (nCurrentMagnetZ < mnMagnetSleepThreshold)) {
+				Serial.println("sleep mode " + nCurrentMagnetZ);
 				SleepMode();
 			} else if (mbSleepMode && (nCurrentMagnetZ > mnMagnetSleepThreshold)) {
 				ActiveMode();
@@ -578,8 +606,9 @@ void SleepMode() {
 	tft.fillScreen(ST77XX_BLACK);		
 	tft.enableSleep(true);
 	
+	DisableSound();
 	//set sound trigger pin HIGH, as low causes playback
-	digitalWrite(SOUND_TRIGGER_PIN, HIGH);
+	//digitalWrite(SOUND_TRIGGER_PIN, HIGH);
 	
 	//board edge LEDs off
 	digitalWrite(LED_RED, LOW);
@@ -638,11 +667,33 @@ void ActiveMode() {
 }
 
 void ActivateSound() {
-	digitalWrite(SOUND_TRIGGER_PIN, LOW);
+	//2025.06.16  need option to make this work with DFROBOT board, where pull low is like a button trigger
+	if (SOUND_BUTTON_TRIGGERSTYLE) {
+		if (!mbSoundPlaying) {
+			digitalWrite(SOUND_TRIGGER_PIN, LOW);
+			delay(100);
+			digitalWrite(SOUND_TRIGGER_PIN, HIGH);
+			mbSoundPlaying = true;
+		}
+	} else {
+		digitalWrite(SOUND_TRIGGER_PIN, LOW);
+		mbSoundPlaying = true;
+	}	
 }
 
-void DisableSound() {
-	digitalWrite(SOUND_TRIGGER_PIN, HIGH);
+void DisableSound() {	
+	//2025.06.16 modified to use button trigger style for DFROBOT board
+	if (SOUND_BUTTON_TRIGGERSTYLE) {
+		if (mbSoundPlaying) {
+			digitalWrite(SOUND_TRIGGER_PIN, LOW);
+			delay(100);
+			digitalWrite(SOUND_TRIGGER_PIN, HIGH);
+			mbSoundPlaying = false;
+		}
+	} else {
+		digitalWrite(SOUND_TRIGGER_PIN, HIGH);
+		mbSoundPlaying = false;
+	}
 }
 
 void RunNeoPixelColor(int nPin) {
@@ -834,7 +885,8 @@ void RunBoardLEDs() {
 
 void ActivateFlash() {
 	//all neopixel objects are chains, so have to call it by addr
-	ledBoard.setPixelColor(0, 255, 255, 255);
+	// 2025.05.27 - per reddit RGB gaming thread, using this for a more true white color
+	ledBoard.setPixelColor(0, 255, 235, 212);
 	ledBoard.show();
 }
 
@@ -1164,7 +1216,7 @@ void ResetWireClock() {
 
 void SetThermalClock() {
 	//max viable speed on this board. used only for thermal camera. 
-	//adafruit board definitions force any call to this with over 400k down to 400k.
+	//adafruit board definitions force any call to this with value over 400k down to 400k.
 	Wire.flush();	
 	Wire.setClock(400000);
 }
